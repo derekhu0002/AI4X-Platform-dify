@@ -2,9 +2,6 @@
 
 ## 价值流视角
 - 价值流：价值流 1：持续安全交付闭环
-- 串联 Business Process：
-  1. [BP 威胁建模 TARA 分析](../business_processes/BP_威胁建模_TARA分析.md)
-  2. [BP 验证与修复 自动化测试与修复](../business_processes/BP_验证与修复_自动化测试与修复.md)
 
 ## 用户故事（跨流程）
 - 作为：研发安全负责人（DevSecOps Owner）
@@ -41,10 +38,6 @@
 
 ### 用户交互流程
 1. **BP - 威胁建模 TARA 分析:** 用户输入系统架构，系统生成 `sdo:Attack-Pattern[]` 与 `sdo:Identity[]` 关系
-2. **BP - 需求生成 合规映射:** 上传 Attack-Pattern JSON + 法规文档，系统生成 `sdo:Course-of-Action[]` (SRS)
-3. **BP3 - 代码检测页面:** 输入源代码 + 依赖清单，系统执行 SAST/SCA，输出 `sdo:Vulnerability[]` + `affects` 关系
-4. **BP4 - 供应链完整性验证页面:** 输入依赖清单 + 构建产物，系统生成 `sdo:Report(integrity-check)`
-5. **BP5 - 验证与修复页面:** 输入漏洞 + 需求，系统生成 `sdo:Report(test_result)` + `sdo:Course-of-Action(remediation)`
 
 ### 端到端数据流
 ```
@@ -52,24 +45,8 @@
   ↓
 BP1 (threat_model) → sdo:Attack-Pattern[], sdo:Identity[], sdo:Relationship(threatens)
   ↓
-BP2 (analyze_compliance) → sdo:Course-of-Action[] (SRS控制项), sdo:Relationship(maps_to)
-  ↓
-BP3 (sast_sca_scan) → sdo:Vulnerability[], sdo:Relationship(affects文件/依赖)
-  ↓
-BP4 (supply_chain_integrity) → sdo:Report[] (完整性报告)
-  ↓
-BP5 (validate_remediate) → sdo:Report[], sdo:Course-of-Action[] (修复方案), sdo:Relationship(remediates)
-  ↓
 输出 (可发布判定 + 完整审计链)
 ```
-
-### 已实现的页面与功能
-- **威胁建模 (BP1):** 结构化威胁表 + 资产映射
-- **需求生成 (BP2):** 合规条款映射输出 SRS
-- **代码检测 (BP3):** SAST/SCA 扫描 + 漏洞表 + 影响关系
-- **供应链完整性验证 (BP4):** 完整性报告
-- **验证与修复 (BP5):** 测试报告 + 修复方案清单
-- **知识图谱集成:** 所有输出 STIX 对象自动保存到 Neo4j
 
 ### 关键指标
 - **链路追踪ID:** 唯一 Bundle ID 串联全部环节

@@ -1,0 +1,66 @@
+{
+  "type": "bundle",
+  "id": "bundle--<%= (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000' %>",
+  "spec_version": "2.1",
+  "objects": [
+    <% 
+    function isList(v) {
+      return !!(v && typeof v.length === 'number' && typeof v.forEach === 'function');
+    }
+
+    if (isList(notification_content) && notification_content.length > 0) {
+      notification_content.forEach(function(group, groupIndex) {
+        if (group && isList(group.events) && group.events.length > 0) {
+          group.events.forEach(function(event, eventIndex) {
+            
+            // We ensure we have an ID to look up later
+            var targetId = event.instance_id || (event.instance ? event.instance.id : null);
+            var targetStandardId = event.instance ? event.instance.standard_id : (targetId);
+
+            // OpenCTI template test may call startsWith on ID fields internally.
+            // Ensure every emitted ID is always a defined string with a STIX-like prefix.
+            var fallbackUuid = (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000';
+            var rawTargetId = targetId ? ('' + targetId) : '';
+            var rawStandardId = targetStandardId ? ('' + targetStandardId) : '';
+            var safeStandardId = rawStandardId || rawTargetId || ('vulnerability--' + fallbackUuid);
+            if (typeof safeStandardId !== 'string') {
+              safeStandardId = '' + (safeStandardId || '');
+            }
+            if (safeStandardId.indexOf('vulnerability--') !== 0) {
+              safeStandardId = 'vulnerability--' + safeStandardId;
+            }
+
+            var safeLookupId = rawTargetId || rawStandardId || fallbackUuid;
+    %>
+    {
+      "type": "vulnerability",
+      "id": "<%= safeStandardId %>",
+      "created": "<%= new Date().toISOString() %>",
+      "modified": "<%= new Date().toISOString() %>",
+      
+      <% /* 1. SIGNAL NAME: Tells your system this is just a signal */ %>
+      "name": "[SIGNAL] Lookup Required for: <%= (event.message || 'Unknown Event').replace(/"/g, '\\"') %>",
+      
+      <% /* 2. DESCRIPTION: Operation type */ %>
+      "description": "Operation: <%= event.operation || 'unknown' %>",
+      
+      <% /* 3. CRITICAL DATA FOR LOOKUP: The raw UUID */ %>
+      "x_opencti_id": "<%= safeLookupId %>",
+      
+      <% /* 4. FLAG: Tells your code to ignore this body and query the API */ %>
+      "x_opencti_lookup_required": true,
+
+      "labels": ["notification-signal"]
+    }
+    <% 
+            /* Add comma if not the last item */
+                if (groupIndex !== notification_content.length - 1 || eventIndex !== group.events.length - 1) {
+    %>,<% 
+            }
+          }); 
+        }
+      });
+    } 
+    %>
+  ]
+}
