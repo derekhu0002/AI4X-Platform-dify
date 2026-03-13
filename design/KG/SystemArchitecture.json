@@ -51,7 +51,7 @@
 "name": "请基于现有应用层架构，结合战略动机层和业务层的设计输出应用层架构设计文档"
 ,"type": "ToDo"
 ,"status": "Active"
-,"description": "战略动机层见：StrategyLayerAndMotivationAspect元素下的子图\r\n业务层见：BusinessLayer元素下的子图\r\n输出到design\\applicationlayer下《AI4sec应用层架构设计》\r\n模板不限，需要提现渐进式披露和关注点分离原则\r\n先交付 Markdown 文档。\r\n区分“各类情报消费者”在应用层中的细分角色映射，例如研发安全负责人、SOC 经理、管理层、业务负责人在各场景中的入口差异，需结合业务层角色与价值流故事整理\r\n应用层要呈现到何种深度的接口契约、输入输出载荷或消息协议，需补充到 API 级别"
+,"description": "战略动机层见：StrategyLayerAndMotivationAspect元素下的子图\r\n业务层见：BusinessLayer元素下的子图\r\n输出到design\\applicationlayer下《AI4sec应用层架构设计.md》，尽量用较多的Mermaid 或表格，比例不限，目的是让人能快速理解。\r\n模板不限，需要提现渐进式披露和关注点分离原则\r\n先交付 Markdown 文档。\r\n区分“各类情报消费者”在应用层中的细分角色映射，例如研发安全负责人、SOC 经理、管理层、业务负责人在各场景中的入口差异，需结合业务层角色与价值流故事整理\r\n应用层要呈现到何种深度的接口契约、输入输出载荷或消息协议，需补充到 API 级别\r\n设计各类消费者在 Dify UI、Agent 工作流\r\n通知通道中权限控制暂不做\r\n“各类情报消费者”在应用层中的正式角色命名要完全沿用业务层角色\r\nAPI 级别建议统一细化到“接口目录 + 调用方/被调用方 + 认证方式 + 请求体/响应体关键字段 + 异步事件消息体 + 错误语义 + 版本策略”七段式；同步接口至少写到资源名、关键字段、必填项、幂等要求，异步消息至少写到事件名、触发条件、STIX 对象类型、重试语义。若正文篇幅受限，可只对 VS1 至 VS4 各挑 1 条主链路做完整模板，其余链路复用统一约定。\r\n应用层建议显式描述 OpenCTI webhook 回查缓存、GraphQL 查询限流、字段裁剪策略，但粒度控制在“接口契约约束”而不是“实现细节”。推荐写法是：把回查缓存定义为 Agent 侧性能与幂等保护机制；把限流定义为 OpenCTI 查询配额与退避要求；把字段裁剪定义为 MCP 的响应投影能力，并在契约中只写调用方可见行为、触发条件和失败处理，不展开缓存结构、限流算法或具体代码。\r\n通知通道建议在不做权限控制设计的前提下，仍补齐最小通知契约：模板粒度按“发布判定/事件响应/漏洞预警/监控上线”4 类定义，收件人分层按“主责人、审批人、抄送人”3 层定义，升级矩阵按“普通、高、中断级”3 档定义触发条件与升级路径。正文中只需说明角色映射、通知内容结构和升级规则边界，不下沉到 RBAC、组织架构同步或 SMTP 配置实现。\r\n四条价值流中每条“主链路”要选VS4-E2E_环境感知监控闭环_端到端用户故事作为完整七段式接口契约样板\r\n- API 目录按“共享能力 + 价值流场景”两级分组：`/api/v1/tasks`、`/api/v1/context`、`/api/v1/knowledge`、`/api/v1/notifications` 作为共享域；`/api/v1/threat-modeling` 对应 VS1、`/api/v1/incident-response` 对应 VS2、`/api/v1/vulnerability-intelligence` 对应 VS3、`/api/v1/monitoring-rules` 对应 VS4。\r\n   - 异步入口与系统回调独立分组：保留 webhook 目录在 `/webhooks/opencti/*`、`/webhooks/pipeline/*`、`/webhooks/siem/*`，避免与人机交互型 API 混杂。\r\n   - 版本策略建议采用“URI 主版本 + 事件名主版本”双轨制：HTTP 接口统一 `/api/v1/...`；异步事件命名采用 `ai4sec.&lt;domain&gt;.&lt;event&gt;.v1`，例如 `ai4sec.incident-response.case-created.v1`。\r\n   - 小版本兼容变更不改 URI，只在文档中记录 `schema_revision` 或 `x-contract-revision`；只有字段含义破坏性变化时再升到 `v2`。\r\n   - 错误码体系建议采用“域前缀 + 四位数字”统一规则：`VAL-4001` 参数校验失败、`AUTH-4010` 身份校验失败、`AUTH-4030` 权限不足、`CTI-4041` STIX 对象不存在、`MCP-4090` 字段投影冲突、`RATE-4290` 查询配额触发、`ASYNC-4990` 异步处理超时、`UPSTREAM-5020` OpenCTI / 外部上游异常、`NOTIFY-5030` 通知投递失败。\r\n   - 接口路径命名规则建议统一使用小写、kebab-case、复数资源名、避免动作动词进入路径；动作语义放在 HTTP 方法或子资源中，例如 `POST /api/v1/incident-response/cases`、`POST /api/v1/monitoring-rules/rules/{rule_id}/publish`。\r\n- Dify UI 中各角色入口的页面级 IA、菜单层级和交互颗粒度，建议结合业务角色采用“统一壳层 + 角色工作台 + 场景中心”结构：\r\n   - 一级菜单建议固定为：`工作台`、`情报任务`、`场景中心`、`知识与证据`、`通知中心`、`治理与审计`。\r\n   - `工作台` 作为角色化首页：情报分析师默认看到待研判任务、跨价值流待办和知识回灌入口；业务负责人默认看到业务影响摘要、发布判定待确认、漏洞窗口期建议；安全负责人默认看到高风险审批、升级决策、跨团队处置视图；管理层默认看到企业影响摘要、优先级决策和中断级态势卡片；安全运营团队默认看到事件分诊、规则上线、命中反馈和行动执行卡片。\r\n   - `场景中心` 下建议按 VS1 至 VS4 直接分栏：`威胁建模`、`运营响应`、`漏洞影响`、`环境监控`。每个场景内部再固定为“任务列表 -&gt; 详情页 -&gt; Agent 对话侧栏 -&gt; 证据抽屉”四层，不做更深菜单树。\r\n   - 页面级 IA 建议遵循“列表页看分流，详情页看证据，侧栏做交互，抽屉看 STIX 对象关系”的颗粒度，避免把长链路完全塞进聊天界面。\r\n   - 角色差异建议体现在默认落点、可见卡片、审批动作和通知订阅范围，不建议拆成 5 套完全不同导航；这样更符合 Progressive Disclosure，也避免 Dify UI 维护成本失控。\r\n   - 交互颗粒度建议：高频动作保持单页闭环，例如“确认影响级别”“批准升级”“发布监控规则”；复杂推理与追问放入 Agent 对话侧栏，不让业务角色直接操作底层 STIX 字段。\r\n\r\n `ai4sec_opencti_mcp` 当前支持哪些响应字段投影配置项、失败码、分页约束，建议在应用层文档中定义如下推荐契约：\r\n   - 字段投影支持两层模式：预置投影档位 + 显式字段白名单。预置档位建议至少有 `minimal`、`summary`、`analysis`、`graph`、`notification` 五档。\r\n   - `minimal` 只返回 `id`、`type`、`standard_id`、`name`、`modified`；`summary` 增加 `description`、`labels`、`confidence`、关键外部引用；`analysis` 增加 `object_marking_refs`、关键关系摘要、核心扩展字段；`graph` 返回对象加一跳关系；`notification` 仅保留通知模板需要的标题、摘要、优先级、目标角色字段。\r\n   - 显式投影参数建议采用：`projection_profile`、`fields[]`、`exclude_fields[]`、`include_relationships`、`relationship_depth`、`relationship_types[]`。其中 `relationship_depth` 默认 `0`，最大建议 `1`，避免应用层查询失控。\r\n   - 失败码建议至少定义：`MCP-4001` 投影档位不存在、`MCP-4002` 字段名非法、`MCP-4003` 字段与对象类型不匹配、`CTI-4041` 对象不存在、`CTI-4091` 对象状态冲突、`RATE-4290` OpenCTI 查询限流、`UPSTREAM-5020` GraphQL 上游失败、`ASYNC-5040` 查询超时。\r\n   - 分页约束建议统一采用 cursor 模式，而不是 offset 模式：入参 `page_size`、`cursor`；出参 `items`、`next_cursor`、`has_more`。`page_size` 默认 `20`、最大 `100`；`graph` 档位默认 `10`、最大 `30`。\r\n   - 为适配业务角色，建议 UI 和 Agent 默认不直接请求 `graph` 全量明细，而先取 `summary` / `notification`，只有情报分析师在证据抽屉中再按需请求 `analysis` 或 `graph`。\r\n\r\n Notification MCP 的模板字段、升级矩阵具体阈值、抄送策略字段名和默认值，建议在应用层文档中给出一套最小但可执行的通知合同：\r\n   - 模板类型固定 4 类：`release-gate-decision`（发布判定）、`incident-response`（事件响应）、`vulnerability-alert`（漏洞预警）、`monitoring-rule-online`（监控上线）。\r\n   - 通用模板字段建议统一为：`template_type`、`message_title`、`message_summary`、`business_impact`、`recommended_action`、`evidence_link`、`primary_role`、`approver_role`、`cc_roles[]`、`severity_tier`、`escalate_after_minutes`、`event_type`、`object_refs[]`、`dedup_key`、`channels[]`。\r\n   - 角色映射字段名建议固定为：`primary_recipients`、`approver_recipients`、`cc_recipients`。默认值建议：`primary_recipients` 必填；`approver_recipients` 默认空数组；`cc_recipients` 默认空数组；`channels` 默认 `[\"email\"]`。\r\n   - 升级矩阵建议按 3 档定义：`普通` 适用于单系统、非生产或中风险事项，`escalate_after_minutes=240`；`高` 适用于生产关键资产、高风险结论或跨团队协同事项，`escalate_after_minutes=30`；`中断级` 适用于生产核心链路中断、重大漏洞已确认影响核心业务、或正在发生的高置信事件，`escalate_after_minutes=10`。\r\n   - 升级路径建议：`普通` 仅通知主责人；`高` 通知主责人并升级到审批人，同时抄送对应业务负责人 / 安全负责人；`中断级` 直接通知主责人、审批人、管理层与安全运营团队值守角色。\r\n   - 抄送策略建议默认最小化：只有满足“跨团队依赖”“需业务窗口确认”“需管理层知悉”三类条件之一时才填充 `cc_recipients`，避免所有通知泛抄送导致噪声。\r\n   - 去重与幂等建议通过 `dedup_key = {template_type}:{object_id}:{severity_tier}:{business_date}` 实现合同级约束，避免同一 STIX 对象短时间重复轰炸。"
 ,"start_date": "2026-3-13"
 ,"due_date": "2026-3-13"
 ,"reporter": "derek"
@@ -110,7 +110,21 @@
 "name": "ai4sec_agent"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/DIFY/ai4sec_agent"
-,"description": "提供业务工作流，在工作流中按需调用MCP和SKILL"
+,"description": "1、提供业务工作流，在工作流中按需调用MCP和SKILL\r\n2、接收到OPENCTI的推送后，由于推送消息中只有对象的ID，没有全量信息，所以还需要回查查出全部信息；"
+,"attributes": [
+{
+"name": "code_paths"
+,"description": "[\"DifyAgentWorkflow\"]//存放dify workflow的yml配置文件和资源文件"
+},
+{
+"name": "回查参考代码"
+,"description": "    async def _resolve_stix_object(self, stix_obj: Dict[str, Any]) -&gt; Optional[Dict[str, Any]]:\r\n        \"\"\"\r\n        Resolve STIX object if lookup is required (Signal strategy)\r\n        \r\n        Args:\r\n            stix_obj: The initial object from webhook (possibly a signal)\r\n            \r\n        Returns:\r\n            The full STIX object, or None if lookup fail/not found. Returns original if not a signal.\r\n        \"\"\"\r\n        if stix_obj.get(\"x_opencti_lookup_required\"):\r\n            opencti_id = stix_obj.get(\"x_opencti_id\") or stix_obj.get(\"id\")\r\n            if not opencti_id:\r\n                logger.error(\"Signal received without ID\")\r\n                return None\r\n\r\n            if opencti_id in self._resolution_cache:\r\n                return self._resolution_cache[opencti_id]\r\n                \r\n            logger.info(f\"Lookup required for signal: {opencti_id}\")\r\n            try:\r\n                client = get_opencti_client()\r\n                full_obj = await client.fetch_stix_object(opencti_id)\r\n                \r\n                if full_obj:\r\n                    logger.info(f\"Successfully resolved full object for {opencti_id}\")\r\n                    self._resolution_cache[opencti_id] = full_obj\r\n                    return full_obj\r\n                else:\r\n                    logger.error(f\"Failed to resolve full object for {opencti_id}\")\r\n                    self._resolution_cache[opencti_id] = None\r\n                    return None\r\n            except Exception as e:\r\n                logger.error(f\"Error resolving object {opencti_id}: {e}\")\r\n                self._resolution_cache[opencti_id] = None\r\n                return None\r\n        \r\n        return stix_obj\r\n\r\n\r\n    async def query_graphql(self, query: str, variables: Optional[Dict[str, Any]] = None) -&gt; Dict[str, Any]:\r\n        \"\"\"\r\n        Execute GraphQL query against OpenCTI\r\n        \r\n        Args:\r\n            query: GraphQL query string\r\n            variables: Query variables\r\n            \r\n        Returns:\r\n            GraphQL response data\r\n            \r\n        Raises:\r\n            Exception: On API error\r\n        \"\"\"\r\n        if not self._initialized:\r\n            await self.initialize()\r\n        \r\n        await self._rate_limit()\r\n        \r\n        try:\r\n            payload = {\r\n                \"query\": query,\r\n                \"variables\": variables or {}\r\n            }\r\n            \r\n            headers = {\r\n                \"Authorization\": f\"Bearer {self.api_key}\",\r\n                \"Content-Type\": \"application/json\"\r\n            }\r\n            \r\n            response = await self.http_client.post(\r\n                self.api_url,\r\n                json=payload,\r\n                headers=headers\r\n            )\r\n            \r\n            if response.status_code != 200:\r\n                logger.error(f\"OpenCTI API error: {response.status_code} - {response.text}\")\r\n                raise Exception(f\"OpenCTI API returned {response.status_code}\")\r\n            \r\n            result = response.json()\r\n            \r\n            if \"errors\" in result:\r\n                logger.error(f\"GraphQL errors: {result['errors']}\")\r\n                raise Exception(f\"GraphQL errors: {result['errors']}\")\r\n            \r\n            logger.debug(f\"GraphQL query succeeded\")\r\n            return result.get(\"data\", {})\r\n            \r\n        except Exception as e:\r\n            logger.error(f\"Error executing GraphQL query: {e}\")\r\n            raise\r\n\r\n\r\n"
+},
+{
+"name": "接收OPENCTI推送的ROUTER"
+,"description": "POST /webhooks/opencti/threat-intelligence"
+}
+]
 },
 {
 "id": "1215",
@@ -118,6 +132,12 @@
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/ai4sec_opencti_mcp"
 ,"description": "负责提供统一的OPENCTI STIX格式情报查询接口，从OPENCTI查询到的结果支持配置哪些字段需要返回给调用者"
+,"attributes": [
+{
+"name": "code_paths"
+,"description": "[\"mcp\\opencti_mcp\"]"
+}
+]
 },
 {
 "id": "1216",
@@ -261,6 +281,12 @@
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/Notification MCP"
 ,"description": "`NotificationTool` 的发送通道采用EMAIL发送，相关参数：\r\n    # Email / SMTP Configuration\r\n    SMTP_SERVER: str = \"smtp.126.com\"\r\n    SMTP_PORT: int = 25\r\n    SMTP_USER: Optional[str] = \"hdhscu@126.com\"\r\n    SMTP_PASSWORD: Optional[str] = \"YMTKyMMt4Gu3x3sE\"\r\n    SMTP_SENDER: str = \"hdhscu@126.com\"\r\n    ALERT_RECIPIENT: str = \"hdhscu@126.com\""
+,"attributes": [
+{
+"name": "code_paths"
+,"description": "[\"mcp\\notification_mcp\"]"
+}
+]
 },
 {
 "id": "1228",
@@ -860,6 +886,16 @@
 ,"target_name":"情报分析师"
 },
 {
+"id":"1108"
+,"statement":"控制缺口复核服务 --(ArchiMate_Serving)--> 安全负责人"
+,"name":"ArchiMate_Serving"
+,"super_type": "ArchiMate_Serving"
+,"source_id":"1252"
+,"target_id":"1233"
+,"source_name":"控制缺口复核服务"
+,"target_name":"安全负责人"
+},
+{
 "id":"1109"
 ,"statement":"事件分诊与响应编排服务 --(ArchiMate_Serving)--> 安全运营团队"
 ,"name":"ArchiMate_Serving"
@@ -870,6 +906,16 @@
 ,"target_name":"安全运营团队"
 },
 {
+"id":"1110"
+,"statement":"事件复盘沉淀服务 --(ArchiMate_Serving)--> 情报分析师"
+,"name":"ArchiMate_Serving"
+,"super_type": "ArchiMate_Serving"
+,"source_id":"1254"
+,"target_id":"1231"
+,"source_name":"事件复盘沉淀服务"
+,"target_name":"情报分析师"
+},
+{
 "id":"1111"
 ,"statement":"外部漏洞企业化影响分析服务 --(ArchiMate_Serving)--> 情报分析师"
 ,"name":"ArchiMate_Serving"
@@ -878,6 +924,16 @@
 ,"target_id":"1231"
 ,"source_name":"外部漏洞企业化影响分析服务"
 ,"target_name":"情报分析师"
+},
+{
+"id":"1112"
+,"statement":"高层决策支撑服务 --(ArchiMate_Serving)--> 管理层"
+,"name":"ArchiMate_Serving"
+,"super_type": "ArchiMate_Serving"
+,"source_id":"1256"
+,"target_id":"1234"
+,"source_name":"高层决策支撑服务"
+,"target_name":"管理层"
 },
 {
 "id":"1113"
@@ -934,7 +990,8 @@
 "1234"
 ]
 ,"included_relationships": [
-"1111"
+"1111",
+"1112"
 ]
 },
 {
@@ -950,7 +1007,8 @@
 "1233"
 ]
 ,"included_relationships": [
-"1107"
+"1107",
+"1108"
 ]
 },
 {
@@ -983,7 +1041,8 @@
 "1231"
 ]
 ,"included_relationships": [
-"1109"
+"1109",
+"1110"
 ]
 },
 {
