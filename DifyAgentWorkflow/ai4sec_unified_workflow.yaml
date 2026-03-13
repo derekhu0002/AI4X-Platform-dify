@@ -1,0 +1,200 @@
+app:
+  description: Unified AI4SEC workflow that routes four value-stream scenarios from one Dify asset.
+  icon: shield
+  icon_background: '#E7F6EC'
+  mode: advanced-chat
+  name: AI4SEC Unified Workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.3.0
+workflow:
+  conversation_variables:
+    - name: selected_flow
+      value: ''
+      value_type: string
+    - name: routing_reason
+      value: ''
+      value_type: string
+  environment_variables:
+    - name: OPENCTI_MCP_URL
+      value: http://localhost:8101
+      value_type: string
+    - name: NOTIFICATION_MCP_URL
+      value: http://localhost:8102
+      value_type: string
+  features:
+    opening_statement: 请选择业务流程，或直接描述你的安全情报需求，我会自动分流到 VS1/VS2/VS3/VS4。
+    suggested_questions:
+      - 帮我做一次发布前威胁建模
+      - 分析一条横向移动告警并生成响应动作
+      - 评估外部漏洞对企业的影响
+      - 生成一条环境感知监控规则
+  graph:
+    edges:
+      - id: edge-start-router
+        source: start-node
+        target: route-intent
+      - id: edge-router-vs1
+        source: route-intent
+        target: call-vs1
+      - id: edge-router-vs2
+        source: route-intent
+        target: call-vs2
+      - id: edge-router-vs3
+        source: route-intent
+        target: call-vs3
+      - id: edge-router-vs4
+        source: route-intent
+        target: call-vs4
+      - id: edge-vs1-answer
+        source: call-vs1
+        target: final-answer
+      - id: edge-vs2-answer
+        source: call-vs2
+        target: final-answer
+      - id: edge-vs3-answer
+        source: call-vs3
+        target: final-answer
+      - id: edge-vs4-answer
+        source: call-vs4
+        target: final-answer
+    nodes:
+      - id: start-node
+        data:
+          title: Unified Entry
+          type: start
+          variables:
+            - label: entry_mode
+              max_length: 64
+              required: false
+              type: text-input
+              variable: entry_mode
+            - label: user_request
+              max_length: 2000
+              required: false
+              type: paragraph
+              variable: user_request
+            - label: selected_flow
+              options:
+                - VS1
+                - VS2
+                - VS3
+                - VS4
+              required: false
+              type: select
+              variable: selected_flow
+      - id: route-intent
+        data:
+          title: Route By Menu Or Intent
+          type: if-else
+          conditions:
+            - case_id: vs1
+              logical_operator: or
+              conditions:
+                - variable_selector:
+                    - start-node
+                    - selected_flow
+                  comparison_operator: equals
+                  value: VS1
+                - variable_selector:
+                    - start-node
+                    - user_request
+                  comparison_operator: contains
+                  value: 威胁建模
+            - case_id: vs2
+              logical_operator: or
+              conditions:
+                - variable_selector:
+                    - start-node
+                    - selected_flow
+                  comparison_operator: equals
+                  value: VS2
+                - variable_selector:
+                    - start-node
+                    - user_request
+                  comparison_operator: contains
+                  value: 响应
+            - case_id: vs3
+              logical_operator: or
+              conditions:
+                - variable_selector:
+                    - start-node
+                    - selected_flow
+                  comparison_operator: equals
+                  value: VS3
+                - variable_selector:
+                    - start-node
+                    - user_request
+                  comparison_operator: contains
+                  value: 漏洞
+            - case_id: default-vs4
+              logical_operator: or
+              conditions:
+                - variable_selector:
+                    - start-node
+                    - selected_flow
+                  comparison_operator: equals
+                  value: VS4
+                - variable_selector:
+                    - start-node
+                    - user_request
+                  comparison_operator: contains
+                  value: 监控
+      - id: call-vs1
+        data:
+          title: VS1 Threat Modeling
+          type: http-request
+          method: POST
+          url: '{{#env.OPENCTI_MCP_URL#}}/query'
+          body:
+            object_id: attack-pattern--vs1
+            projection_profile: analysis
+            include_relationships: true
+            relationship_depth: 1
+      - id: call-vs2
+        data:
+          title: VS2 Incident Response
+          type: http-request
+          method: POST
+          url: '{{#env.OPENCTI_MCP_URL#}}/query'
+          body:
+            object_id: incident--vs2
+            projection_profile: analysis
+            include_relationships: true
+            relationship_depth: 1
+      - id: call-vs3
+        data:
+          title: VS3 Vulnerability Intelligence
+          type: http-request
+          method: POST
+          url: '{{#env.OPENCTI_MCP_URL#}}/query'
+          body:
+            object_id: vulnerability--vs3
+            projection_profile: notification
+            include_relationships: false
+      - id: call-vs4
+        data:
+          title: VS4 Monitoring Rules
+          type: http-request
+          method: POST
+          url: '{{#env.OPENCTI_MCP_URL#}}/query'
+          body:
+            object_id: indicator--vs4
+            projection_profile: graph
+            include_relationships: true
+            relationship_depth: 1
+      - id: final-answer
+        data:
+          title: Unified Output
+          type: answer
+          answer: |
+            已完成统一分流。当前工作流会优先使用入口菜单，其次按自然语言意图识别自动路由。
+            对于 OpenCTI webhook 入口，请直接调用 Dify 的 `/webhooks/opencti/threat-intelligence`，当前链路不要求鉴权。
+metadata:
+  architecture:
+    '# @ArchitectureID': '1214'
+  webhook:
+    path: /webhooks/opencti/threat-intelligence
+    auth_required: false
+  runtime_tools:
+    - DifyAgentWorkflow/tools/ai4sec_runtime_tools.py
