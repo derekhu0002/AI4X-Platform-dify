@@ -34,3 +34,28 @@
 - 处置状态：`Contained`
 - 回灌状态：`Enabled`
 - 关键指标：MTTD 下降、MTTR 下降
+
+### 业务操作流程图 (含 DIFY 与 OPENCTI 交互)
+`mermaid
+sequenceDiagram
+    participant SIEM as NDR/SIEM 集成 (外部触发)
+    participant Agent as DIFY Agent (ai4sec_agent 编排大脑)
+    participant CTI as OPENCTI 平台 (STIX 响应底座)
+    participant SOC as 各类情报消费者 (SOC 经理)
+
+    SIEM->>Agent: (通过预置模板 webhook) 推送安全警报快照
+    Note right of SIEM: 输入: 警报描述、可疑流量和资产IP
+    
+    Agent->>CTI: (ai4sec_opencti_mcp) 落盘前置目击并查询上下文
+    Note right of Agent: 提取/录入 STIX (输入):<br/>Observed-Data (流量快照)<br/>Indicator (IoC 匹配)
+    
+    CTI-->>Agent: 下发已知的高阶 APT Attack-Pattern 与 关联黑库资产
+    
+    Agent->>Agent: 智能流决策大模型推演遏制策略 (自动化封禁或隔离判定)
+    
+    Agent->>CTI: (ai4sec_opencti_mcp) 更新防御记录并建立事件档案
+    Note left of CTI: 回储 STIX (输出):<br/>Incident (确认的高危事件)<br/>Course-of-Action (响应实施表)
+    
+    Agent-->>SOC: (Notification MCP) 发送响应分诊研判公报与复盘结论报告
+    Note right of SOC: SOC 经理可通过 OpenCTI 的关联图谱反哺产出全新的威胁画像
+`

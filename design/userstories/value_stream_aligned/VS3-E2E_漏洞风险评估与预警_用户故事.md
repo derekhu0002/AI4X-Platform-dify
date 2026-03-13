@@ -9,6 +9,34 @@
 
 ---
 
+## 自动化重塑执行全景图 (DIFY & OPENCTI 协作流)
+本高阶安全响应场景不仅需要人，全链路底层极大依靠 DIFY Agent 的大脑调度、大模型逻辑切分以及与 OPENCTI 的对象实时存储和联动刷新，输入输出的实盘流转如下：
+
+`mermaid
+sequenceDiagram
+    participant Webhook as 外部漏洞采集源
+    participant Agent as DIFY Agent (ai4sec_agent)
+    participant CTI as OPENCTI 平台 (STIX 全源平台)
+    participant User as 各类情报消费者 (支付业务团队与安全侧)
+
+    Webhook->>Agent: (opencti_webhook_signal_template) 触发系统流
+    Note right of Webhook: STIX (输入):<br/>Report/Vulnerability (源评价: 低危 cvss:3.5)
+
+    Agent->>CTI: 请求该漏洞触达组件的网络纵深与数据关键度
+    Note right of Agent: 发送 STIX 探针查询:<br/>Software (log4j-core:2.19.0)
+
+    CTI-->>Agent: 原样送回图谱片段
+    Note left of CTI: 返回 STIX 图谱要素:<br/>Infrastructure (支付网关集群,含超高权值)<br/>Identity (业务Owner信息)
+
+    Agent->>Agent: Dify 组织提示词模板由大模型重构评估,发掘日志阻断带来的高额风险
+
+    Agent->>CTI: 落盘极高危害分析结果与关联证据链条
+    Note left of CTI: 更新覆写 STIX (输出):<br/>Relationship (Vulnerability affects Infrastructure)<br/>Vulnerability (评级修订为: CRITICAL+)
+
+    Agent-->>User: 将包含详细执行动作的报警借助 Notification MCP 同步触达
+    Note right of User: 业务消费方直达 OpenCTI 验证 STIX 关系链证实该定级，启动应急
+`
+
 ## 故事：支付网关中的日志记录不充分漏洞升级为极高风险
 
 ### 第一幕：漏洞推送进入系统

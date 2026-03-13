@@ -43,3 +43,27 @@ BP1 (threat_model) → sdo:Attack-Pattern[], sdo:Identity[], sdo:Relationship(th
   ↓
 输出 (可发布判定 + 完整审计链)
 ```
+
+### 业务操作流程图 (含 DIFY 与 OPENCTI 交互)
+`mermaid
+sequenceDiagram
+    participant Pipeline as CI/CD 流水线 (触发端)
+    participant Agent as DIFY Agent (ai4sec_agent)
+    participant CTI as OPENCTI 平台 (STIX 数据汇聚底座)
+    participant User as 各类情报消费者 (研发安全负责人)
+
+    Pipeline->>Agent: webhook触发新版本的架构或代码提交
+    Note right of Pipeline: 输入: 原始变更单、组件依赖或系统草图
+
+    Agent->>CTI: (ai4sec_opencti_mcp) 检索组件匹配的历史威胁与风险漏洞
+    Note right of Agent: 提取 STIX (输入):<br/>Software (依赖库), Vulnerability (CVE)<br/>Attack-Pattern (常见战术)
+    CTI-->>Agent: 回传标准化 STIX 关联对象实体
+
+    Agent->>Agent: 执行 TARA 分析, 在大模型处理内将历史情报映射到当期组件
+
+    Agent->>CTI: (ai4sec_opencti_mcp) 落盘当前架构产生的威胁模型与消减控制项
+    Note left of CTI: 生成 STIX (输出):<br/>Attack-Pattern (本地化演化的特定威胁)<br/>Course-of-Action (消减措施)<br/>Relationship (mitigates)
+    
+    Agent-->>User: 调度 Notification MCP 下发发布拦截/验收判定结论
+    Note right of User: 消费者登录 OpenCTI 直接核实该 Bundle ID 下的审计链事实
+`

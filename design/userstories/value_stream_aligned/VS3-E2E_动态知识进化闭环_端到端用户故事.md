@@ -49,30 +49,24 @@
 ### 交互流程图 (Interaction Diagram)
 ```mermaid
 sequenceDiagram
-    participant Source as 外部情报源 (Feeds/Webhooks)
-    participant Intel as 情报摄取 (Threat Intel)
-    participant Fusion as 知识融合 (Knowledge Fusion)
-    participant Risk as 风险预警 (Risk Assessment)
-    participant Graph as 知识图谱 (Neo4j)
-    participant CISO as CISO/决策者
+    participant Source as 外部开源情报源 (Feeds)
+    participant Agent as DIFY Agent (ai4sec_agent 融合推演)
+    participant CTI as OPENCTI 平台 (全维度知识图谱)
+    participant CISO as 各类情报消费者 (管理层/业务接口人)
 
-    note over Source, Intel: 1. 情报摄取 (Discovery)
-    Source->>Intel: 推送 STIX Bundle (含新 CVE / Attack Pattern)
-    Intel->>Intel: 验证签名 & 去重
-    Intel->>Graph: 存入原始情报对象
+    Source->>Agent: 利用转化模板产生 0Day 情报并通知触发
+    Note right of Source: 初步封包 STIX Bundle 传入
 
-    note over Intel, Fusion: 2. 知识融合 (Enrichment)
-    Fusion->>Graph: 读取 内部资产(SBOM) & 外部情报(Bundle)
-    Fusion->>Fusion: 匹配 CPE / 攻击向量
-    Fusion->>Graph: 🆕 创建关联关系 (Vulnerability affects Asset)
-    Fusion->>Graph: 🆕 创建关联关系 (Attack Pattern targets Asset)
+    Agent->>CTI: (ai4sec_opencti_mcp) 落位原生库并抽取内部关联树
+    Note right of Agent: 读取 STIX (输入):<br/>Vulnerability (外部 CVE 实体)<br/>提取软件成分 Software & Infrastructure
+    
+    CTI-->>Agent: 精准传还受该 0Day 波及的内网存量设施清单
 
-    note over Fusion, Risk: 3. 风险预警 (Analysis)
-    Risk->>Graph: 查询受影响资产及其业务价值
-    Risk->>Risk: 计算动态风险评分 (Opinion)
-    Risk-->>CISO: 发送高危预警 (Opinion + Note)
+    Agent->>Agent: 通过 Agent 的大语言模型进行知识融合和威胁烈度二次调整(无需重扫)
 
-    note over Risk, Graph: 4. 威胁分析回路 (Feedback)
-    Risk->>Graph: 标记高危 Attack Pattern 为 "Active Threat"
-    note right of Graph: 触发 VS1 重新评估威胁模型\n触发 VS4 生成新检测规则
+    Agent->>CTI: (ai4sec_opencti_mcp) 生成企业向的融合影响关系
+    Note left of CTI: 持久化 STIX (输出):<br/>Relationship (Vulnerability affects Infrastructure)<br/>注入业务专属评分 Opinion
+    
+    Agent-->>CISO: 经 Notification MCP 推送包含业务后果结论的关键级预警信
+    Note right of CISO: CISO在窗口期消费已提纯情报，直接通过 OpenCTI 进行决策追踪
 ```

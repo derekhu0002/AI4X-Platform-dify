@@ -35,31 +35,25 @@
 ## 交互流程图
 ```mermaid
 sequenceDiagram
-    participant Architect as 安全架构师
-    participant Design as VS1:威胁建模 (TARA)
-    participant Engine as VS4:规则引擎 (Rule Gen)
-    participant Graph as 知识图谱 (Neo4j)
-    participant Ops as VS2:态势感知 (Sighting)
+    participant Design as VS1架构输出结果
+    participant Agent as DIFY Agent (ai4sec_agent 规则翻译工厂)
+    participant CTI as OPENCTI 平台 (防线指引下发枢纽)
+    participant Ops as 各类情报消费者 (安全运营团队)
+
+    Design->>Agent: 系统设计期威胁定性完毕，触发监控转化机制
     
-    note over Architect, Design: 1. 设计阶段威胁输入 (Prediction)
-    Architect->>Design: 定义组件与潜在威胁 (Threat Model)
-    Design->>Graph: 存储 Attack-Pattern & Security-Goal
+    Agent->>CTI: (ai4sec_opencti_mcp) 匹配相关的历史防控逻辑库
+    Note right of Agent: 提取 STIX (输入):<br/>Attack-Pattern (设计指出的高虚警风险)<br/>Course-of-Action (已有审计规则样板)
     
-    note over Design, Engine: 2. 规则自动转化 (Translation)
-    Engine->>Graph: 订阅新增 Attack-Pattern
-    Engine->>Engine: 分析组件技术栈 (FastAPI/Postgres)
-    Engine->>Engine: 匹配检测模板 (Sigma/SPL)
-    Engine->>Graph: 生成关联 Indicator (Internal-Rule)
+    CTI-->>Agent: 下发通用监控准则与关联黑库模型
+
+    Agent->>Agent: Agent 通过大模型翻译业务抽象缺陷为底层 Sigma/SPL等可执行脚本
     
-    note over Engine, Ops: 3. 规则下发与监控 (Detection)
-    Graph->>Ops: 实时同步 Indicator 规则库
-    Ops->>Ops: 实施监控 (Context-Aware Alerting)
+    Agent->>CTI: 回写新产生的内部专属防御监控特征基线
+    Note left of CTI: 生成 STIX (输出):<br/>Indicator (附带业务环境签名的安全监控模式)<br/>Relationship (Indicator indicates Attack-Pattern)
     
-    note over Ops, Design: 4. 闭环反馈 (Loop to Architect)
-    Ops->>Graph: 写入 Sighting (规则命中)
-    Graph-->>Design: 统计威胁命中率
-    Design->>Architect: 验证威胁模型准确性 (True Positive)
-    Architect->>Design: 调整威胁优先级/新增威胁
+    Agent-->>Ops: 联动底层监控工具使新部署 Indicator 生效(或经MCP发布)
+    Note right of Ops: 运营者消费基于该定制 Indicator 发火的预警，过滤通用噪音
 ```
 
 ## 数据流 (Data Flow)
