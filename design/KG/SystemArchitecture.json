@@ -1,0 +1,432 @@
+{
+"name": "System",
+"description": "",
+"elements": [
+{
+"id": "1207",
+"name": "StrategyLayerAndMotivationAspect"
+,"type": "ArchiMate_Assessment"
+,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect"
+,"subdiagram_views": [
+{
+"view_id": "159",
+"view_name": "StrategyLayerAndMotivationAspect"
+}
+]
+},
+{
+"id": "1208",
+"name": "BusinessLayer"
+,"type": "ArchiMate_Assessment"
+,"browser_path": "Model/System/BusinessLayer/BusinessLayer"
+,"subdiagram_views": [
+{
+"view_id": "160",
+"view_name": "BusinessLayer"
+}
+]
+},
+{
+"id": "1209",
+"name": "ApplicationLayer"
+,"type": "ArchiMate_Assessment"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer"
+,"project_info": {
+"tasks": [
+{
+"name": "请基于整体架构构思细化实现方案"
+,"type": "ToDo"
+,"status": "Active"
+,"description": "1、本次仅交付设计文档\r\n2、需要包含：`ai4sec_opencti_mcp` 的接口协议、认证方式、错误码规范\r\n3、`ai4sec_agent` 在 DIFY 中的具体工作流是为了支撑“VS3-E2E_动态知识进化闭环_端到端用户故事”元素下的用户故事实现；\r\n4、STIX BUNDLE 的字段裁剪策略与下游消费者请按照实现用户故事的目标进行设计；"
+,"start_date": "2026-3-13"
+,"due_date": "2026-3-13"
+,"reporter": "derek"
+,"priority": "Low",
+"assigned_to": "llm"
+}
+]
+}
+,"subdiagram_views": [
+{
+"view_id": "164",
+"view_name": "ApplicationLayer"
+}
+]
+},
+{
+"id": "1210",
+"name": "TechnologyLayer"
+,"type": "ArchiMate_Assessment"
+,"browser_path": "Model/System/TechnologyLayer/TechnologyLayer"
+,"subdiagram_views": [
+{
+"view_id": "162",
+"view_name": "TechnologyLayer"
+}
+]
+},
+{
+"id": "1211",
+"name": "ProjectManagement"
+,"type": "ArchiMate_Assessment"
+,"browser_path": "Model/System/ProjectManagement/ProjectManagement"
+,"subdiagram_views": [
+{
+"view_id": "163",
+"view_name": "ProjectManagement"
+}
+]
+},
+{
+"id": "1212",
+"name": "DIFY"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/DIFY"
+},
+{
+"id": "1213",
+"name": "SKILL"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/DIFY/SKILL"
+,"description": "提供业务特殊的SKILL"
+},
+{
+"id": "1214",
+"name": "ai4sec_agent"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/DIFY/ai4sec_agent"
+,"description": "提供业务工作流，在工作流中按需调用MCP和SKILL"
+},
+{
+"id": "1215",
+"name": "ai4sec_opencti_mcp"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/ai4sec_opencti_mcp"
+,"description": "负责提供统一的OPENCTI STIX格式情报查询接口，从OPENCTI查询到的结果支持配置哪些字段需要返回给调用者"
+},
+{
+"id": "1216",
+"name": "OpenCTI platform"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/OpenCTI platform"
+,"attributes": [
+{
+"name": "docker-composer.yml",
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\external_opencti\\\\docker-compose.dev.yml\n\nservices:\r\n  opencti-dev-redis:\r\n    container_name: opencti-dev-redis\r\n    image: redis:8.4.0\r\n    restart: unless-stopped\r\n    ports:\r\n      - \"6379:6379\"\r\n  opencti-dev-elasticsearch:\r\n    container_name: opencti-dev-elasticsearch\r\n    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.8\r\n    environment:\r\n      - discovery.type=single-node\r\n      - xpack.ml.enabled=false\r\n      - xpack.security.enabled=false\r\n      - \"ES_JAVA_OPTS=-Xms8G -Xmx8G\"\r\n    restart: unless-stopped\r\n    ulimits:\r\n      memlock:\r\n        soft: -1\r\n        hard: -1\r\n      nofile:\r\n        soft: 65536\r\n        hard: 65536\r\n    ports:\r\n      - \"9200:9200\"\r\n      - \"9300:9300\"\r\n  opencti-dev-kibana:\r\n    container_name: opencti-dev-kibana\r\n    image: docker.elastic.co/kibana/kibana:8.19.8\r\n    environment:\r\n      - ELASTICSEARCH_HOSTS=http://opencti-dev-elasticsearch:9200\r\n    restart: unless-stopped\r\n    ports:\r\n      - \"5601:5601\"\r\n    depends_on:\r\n      - opencti-dev-elasticsearch\r\n  opencti-dev-minio:\r\n    container_name: opencti-dev-minio\r\n    image: minio/minio:RELEASE.2025-06-13T11-33-47Z\r\n    ports:\r\n      - \"9000:9000\"\r\n      - \"9001:9001\"\r\n    environment:\r\n      MINIO_ROOT_USER: ${MINIO_ROOT_USER}\r\n      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}\r\n    command: server /data --console-address \":9001\"\r\n    restart: unless-stopped\r\n  opencti-dev-rabbitmq:\r\n    container_name: opencti-dev-rabbitmq\r\n    image: rabbitmq:4.2-management\r\n    volumes:\r\n      - type: bind\r\n        source: rabbitmq.conf\r\n        target: /etc/rabbitmq/rabbitmq.conf\r\n    restart: unless-stopped\r\n    ports:\r\n      - \"5672:5672\"\r\n      - \"15672:15672\"\r\n"
+},
+{
+"name": "evn",
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\external_opencti\\\\.env\n\n###########################\r\n# DEPENDENCIES            #\r\n###########################\r\n\r\nMINIO_ROOT_USER=opencti\r\nMINIO_ROOT_PASSWORD=ChangeMe123!\r\nRABBITMQ_DEFAULT_USER=opencti\r\nRABBITMQ_DEFAULT_PASS=ChangeMe123!\r\nSMTP_HOSTNAME=localhost\r\nOPENSEARCH_ADMIN_PASSWORD=ChangeMe123!\r\nELASTIC_MEMORY_SIZE=4G\r\n\r\n###########################\r\n# COMMON                  #\r\n###########################\r\n\r\nXTM_COMPOSER_ID=8215614c-7139-422e-b825-b20fd2a13a23\r\nCOMPOSE_PROJECT_NAME=xtm\r\n\r\n###########################\r\n# OPENCTI                 #\r\n###########################\r\n\r\nOPENCTI_HOST=localhost\r\nOPENCTI_PORT=8080\r\nOPENCTI_EXTERNAL_SCHEME=http\r\nOPENCTI_ADMIN_EMAIL=admin@opencti.io\r\nOPENCTI_ADMIN_PASSWORD=ChangeMe123!\r\nOPENCTI_ADMIN_TOKEN=c118a69a-9d60-441f-b30b-a0967694707e\r\nOPENCTI_HEALTHCHECK_ACCESS_KEY=6f820a48-ef86-4b7d-8e81-978d9b15f155\r\n###########################\r\n# OPENCTI CONNECTORS      #\r\n###########################\r\n\r\nCONNECTOR_EXPORT_FILE_STIX_ID=dd817c8b-abae-460a-9ebc-97b1551e70e6\r\nCONNECTOR_EXPORT_FILE_CSV_ID=7ba187fb-fde8-4063-92b5-c3da34060dd7\r\nCONNECTOR_EXPORT_FILE_TXT_ID=ca715d9c-bd64-4351-91db-33a8d728a58b\r\nCONNECTOR_IMPORT_FILE_STIX_ID=72327164-0b35-482b-b5d6-a5a3f76b845f\r\nCONNECTOR_IMPORT_DOCUMENT_ID=c3970f8a-ce4b-4497-a381-20b7256f56f0\r\nCONNECTOR_IMPORT_FILE_YARA_ID=7eb45b60-069b-4f7f-83a2-df4d6891d5ec\r\nCONNECTOR_IMPORT_EXTERNAL_REFERENCE_ID=d52dcbc8-fa06-42c7-bbc2-044948c87024\r\nCONNECTOR_ANALYSIS_ID=4dffd77c-ec11-4abe-bca7-fd997f79fa36\r\n\r\n###########################\r\n# OPENCTI DEFAULT DATA    #\r\n###########################\r\n\r\nCONNECTOR_OPENCTI_ID=dd010812-9027-4726-bf7b-4936979955ae\r\nCONNECTOR_MITRE_ID=8307ea1e-9356-408c-a510-2d7f8b28a0e2"
+},
+{
+"name": "opencti_webhook_signal_template",
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\config\\\\opencti_webhook_signal_template.ejs\n\n{\r\n  \"type\": \"bundle\",\r\n  \"id\": \"bundle--<%= (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000' %>\",\r\n  \"spec_version\": \"2.1\",\r\n  \"objects\": [\r\n    <% \r\n    function isList(v) {\r\n      return !!(v && typeof v.length === 'number' && typeof v.forEach === 'function');\r\n    }\r\n\r\n    if (isList(notification_content) && notification_content.length > 0) {\r\n      notification_content.forEach(function(group, groupIndex) {\r\n        if (group && isList(group.events) && group.events.length > 0) {\r\n          group.events.forEach(function(event, eventIndex) {\r\n            \r\n            // We ensure we have an ID to look up later\r\n            var targetId = event.instance_id || (event.instance ? event.instance.id : null);\r\n            var targetStandardId = event.instance ? event.instance.standard_id : (targetId);\r\n\r\n            // OpenCTI template test may call startsWith on ID fields internally.\r\n            // Ensure every emitted ID is always a defined string with a STIX-like prefix.\r\n            var fallbackUuid = (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000';\r\n            var rawTargetId = targetId ? ('' + targetId) : '';\r\n            var rawStandardId = targetStandardId ? ('' + targetStandardId) : '';\r\n            var safeStandardId = rawStandardId || rawTargetId || ('vulnerability--' + fallbackUuid);\r\n            if (typeof safeStandardId !== 'string') {\r\n              safeStandardId = '' + (safeStandardId || '');\r\n            }\r\n            if (safeStandardId.indexOf('vulnerability--') !== 0) {\r\n              safeStandardId = 'vulnerability--' + safeStandardId;\r\n            }\r\n\r\n            var safeLookupId = rawTargetId || rawStandardId || fallbackUuid;\r\n    %>\r\n    {\r\n      \"type\": \"vulnerability\",\r\n      \"id\": \"<%= safeStandardId %>\",\r\n      \"created\": \"<%= new Date().toISOString() %>\",\r\n      \"modified\": \"<%= new Date().toISOString() %>\",\r\n      \r\n      <% /* 1. SIGNAL NAME: Tells your system this is just a signal */ %>\r\n      \"name\": \"[SIGNAL] Lookup Required for: <%= (event.message || 'Unknown Event').replace(/\"/g, '\\\\\"') %>\",\r\n      \r\n      <% /* 2. DESCRIPTION: Operation type */ %>\r\n      \"description\": \"Operation: <%= event.operation || 'unknown' %>\",\r\n      \r\n      <% /* 3. CRITICAL DATA FOR LOOKUP: The raw UUID */ %>\r\n      \"x_opencti_id\": \"<%= safeLookupId %>\",\r\n      \r\n      <% /* 4. FLAG: Tells your code to ignore this body and query the API */ %>\r\n      \"x_opencti_lookup_required\": true,\r\n\r\n      \"labels\": [\"notification-signal\"]\r\n    }\r\n    <% \r\n            /* Add comma if not the last item */\r\n                if (groupIndex !== notification_content.length - 1 || eventIndex !== group.events.length - 1) {\r\n    %>,<% \r\n            }\r\n          }); \r\n        }\r\n      });\r\n    } \r\n    %>\r\n  ]\r\n}"
+}
+]
+},
+{
+"id": "1217",
+"name": "外部信息爬取AGENT"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/外部信息爬取AGENT"
+},
+{
+"id": "1218",
+"name": "外部网站"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/外部网站"
+,"description": "如抖音、微博、X、FACEBOOK等，可能存在一些威胁情报信息"
+},
+{
+"id": "1219",
+"name": "情报分析师"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/情报分析师"
+},
+{
+"id": "1220",
+"name": "各类情报消费者"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/各类情报消费者"
+,"description": "包括业务领导、技术专家等各类角色"
+},
+{
+"id": "1221",
+"name": "支持快速的情报生产和消费"
+,"type": "ArchiMate_Goal"
+,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/支持快速的情报生产和消费"
+},
+{
+"id": "1222",
+"name": "VS3-E2E_动态知识进化闭环_端到端用户故事"
+,"type": "ArchiMate_ValueStream"
+,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/VS3-E2E_动态知识进化闭环_端到端用户故事"
+,"attributes": [
+{
+"name": "userstory",
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\design\\\\userstories\\\\value_stream_aligned\\\\VS3-E2E_动态知识进化闭环_端到端用户故事.md\n\n# VS3-E2E 动态知识进化闭环（端到端用户故事）\n\n> **前置依赖约定**：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent 与 OPENCTI 平台的核心操作模式，以及 STIX 2.1 与 Notification 的强制架构准则。\n\n## 价值流视角\n- 价值流：价值流 3：动态知识进化闭环\n\n## 用户故事（跨流程）\n- 作为：各类情报消费者（CISO/管理人员等）及情报分析师\n- 我希望：当外部爆发重大零日漏洞时，能利用情报分析师的基线规则对重大外部事件执行靶向解析转换为内部高价值的资产危害通告\n- 以便：情报消费者能在事件窗口期精准消费该高质量业务情报并一键完成隔离和修补决策\n## 验收标准\n1. 支持定时采集外部零日情报并形成 `Bundle`。\n2. `Bundle` 可与内部 SBOM/资产图谱自动融合，形成 `affects/targets/uses` 关系。\n3. 在无需全量重扫条件下输出受影响资产清单、风险等级（Opinion）与处置建议（Note）。\n4. 支持管理层视角的快速决策摘要（15 分钟内可用）。\n## SHOWCASE（端到端）\n### 场景\n外部披露高危零日（如组件 RCE），管理层要求 15 分钟内给出影响面\n### 输入\n- 外部公告与情报Feed\n- 内部 SBOM、资产图谱、业务关键级\n### 执行链路\n1. 多源采集生成原始情报包\n2. 图谱融合定位受影响组件和系统\n3. 风险评估输出高/中/低分层资产清单与应对优先级\n### 输出\n- `Opinion`：总体风险等级（如 High）\n- `Note`：建议动作（隔离、补丁、监控增强）\n- `Vulnerability affects Asset` 关系清单\n### 业务价值\n- 在无需全量扫描情况下快速给出受影响资产与决策依据\n\n## 已验证的实现展示 (Verified End-to-End Implementation)\n### 用户交互流程\n1. **BP - 情报摄取:** 填写外部情报源，系统采集并生成 Bundle\n2. **BP - 知识融合:** 输入 Bundle + 内部 SBOM，生成 enriched Vulnerability + affects 关系\n3. **BP - 风险预警:** 输入 enriched Vulnerability，系统输出 Opinion(风险等级) + Note(建议)\n### 后端流程\n- **BP - 情报摄取:** threat_intel.ingest_external_intel() -> Bundle\n- **BP - 知识融合:** knowledge_fusion.fuse_bundle_with_sbom() -> enriched Vulns\n- **BP - 风险预警:** risk_assessment.assess_impact() -> Opinion+Note\n### 关键指标\n- **采集频率:** 每小时/每日自动采集外部源\n- **融合准确率:** 匹配成功资产/漏洞关系数\n- **业务影响:** 零日漏洞影响系统可追溯\n\n\n### 交互流程图 (Interaction Diagram)\n```mermaid\nsequenceDiagram\n    participant Source as 外部情报源 (Feeds/Webhooks)\n    participant Intel as 情报摄取 (Threat Intel)\n    participant Fusion as 知识融合 (Knowledge Fusion)\n    participant Risk as 风险预警 (Risk Assessment)\n    participant Graph as 知识图谱 (Neo4j)\n    participant CISO as CISO/决策者\n\n    note over Source, Intel: 1. 情报摄取 (Discovery)\n    Source->>Intel: 推送 STIX Bundle (含新 CVE / Attack Pattern)\n    Intel->>Intel: 验证签名 & 去重\n    Intel->>Graph: 存入原始情报对象\n\n    note over Intel, Fusion: 2. 知识融合 (Enrichment)\n    Fusion->>Graph: 读取 内部资产(SBOM) & 外部情报(Bundle)\n    Fusion->>Fusion: 匹配 CPE / 攻击向量\n    Fusion->>Graph: 🆕 创建关联关系 (Vulnerability affects Asset)\n    Fusion->>Graph: 🆕 创建关联关系 (Attack Pattern targets Asset)\n\n    note over Fusion, Risk: 3. 风险预警 (Analysis)\n    Risk->>Graph: 查询受影响资产及其业务价值\n    Risk->>Risk: 计算动态风险评分 (Opinion)\n    Risk-->>CISO: 发送高危预警 (Opinion + Note)\n\n    note over Risk, Graph: 4. 威胁分析回路 (Feedback)\n    Risk->>Graph: 标记高危 Attack Pattern 为 \"Active Threat\"\n    note right of Graph: 触发 VS1 重新评估威胁模型\\n触发 VS4 生成新检测规则\n```\n"
+},
+{
+"name": "userstory2",
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\design\\\\userstories\\\\value_stream_aligned\\\\VS3-E2E_漏洞风险评估与预警_用户故事.md\n\n# 用户故事：低危漏洞触发高风险评估并发预警邮件\n\n> **前置依赖约定**：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent 与 OPENCTI 平台的核心操作模式，以及 STIX 2.1 与 Notification 的强制架构准则。\n\n<!-- @ArchitectureID: 1068 -->\n\n## 概要\n本例详述了系统作为“替代性”的情报分析师，如何把初步外部威胁结合内网调用图谱等要素，自动化提纯为定制的结构化高级预警，并最终由 Notification MCP 分发给特定的情报消费者（如系统负责人与业务团队）。\n\n---\n\n## 故事：支付网关中的日志记录不充分漏洞升级为极高风险\n\n### 第一幕：漏洞推送进入系统\n\n**时间**：2026-03-15 上午 09:30（UTC+8）\n\nOpenCTI 威胁情报平台检测到一个新发布的漏洞编号 **CVE-2026-4141**，属于常见的开源日志库 `log4j-core v2.19.0` 中的一个日志信息泄露缺陷。该漏洞严重度被外部评为 **CVSS 3.5（低危）**，因为它只在特定配置下触发，且影响面相对有限。\n\nOpenCTI 立即通过 webhook 将漏洞通知推送给 AIForSec 系统：\n\n```json\n{\n  \"event_type\": \"vulnerability_created\",\n  \"cve_id\": \"CVE-2026-4141\",\n  \"title\": \"Improper Logging in log4j-core 2.19.0\",\n  \"external_references\": [\n    {\n      \"source_name\": \"NVD\",\n      \"url\": \"https://nvd.nist.gov/vuln/detail/CVE-2026-4141\"\n    }\n  ],\n  \"affected_packages\": [\n    {\n      \"name\": \"log4j-core\",\n      \"version\": \"2.19.0\",\n      \"ecosystem\": \"maven\"\n    }\n  ]\n}\n```\n\n### 第二幕：情报摄取与初步归一化\n\nAIForSec 的 `OpenCTITool` 接收到 webhook 推送后，系统的**威胁情报插件（Threat Intel Plugin）** 自动启动数据摄取流程：\n\n1. **数据拉取**：通过 ai4sec_opencti_mcp 向 OpenCTI 查询 CVE-2026-4141 的完整信息，包括：\n   - 漏洞描述与技术细节（不充分的日志记录会导致安全审计日志缺失）\n   - 受影响的软件版本范围\n   - 已知的攻击向量（需要特定的日志配置才能触发）\n   - 相关的 CVSS 评分与严重度\n\n2. **结构化归一化**：威胁情报插件将这些信息转换为 STIX 2.1 `Vulnerability` 对象，并标注：\n   - 组件名称：`log4j-core`\n   - 版本：`2.19.0`\n   - 功能影响：日志记录功能的不充分审计日志输出\n   - 代码级影响：基于 SBOM，该版本被集成处调用\n\n### 第三幕：内部资产关系查询\n\n**关键决策点**：此时一个普通的安全工具可能会就此停止分析，记录\"低危漏洞\"并存档。但 AIForSec 的**统一数据访问层（DAL）** 开始执行资产关系查询：\n\n1. **查询内部组件使用关系**：\n   ```\n   Q: \"我们的产品中哪些部件使用了 log4j-core v2.19.0？\"\n   \n   A: [\n     {\n       \"product\": \"支付网关服务 (Payment Gateway)\",\n       \"component\": \"log4j-core v2.19.0\",\n       \"sub_component\": \"交易日志模块\",\n       \"feature_usage\": [\n         \"记录所有支付交易（金额、用户、时间戳）\",\n         \"记录失败的支付尝试和错误信息\"\n       ],\n       \"criticality\": \"CRITICAL\"\n     }\n   ]\n   ```\n\n2. **功能影响分析**：\n   - 该漏洞会导致日志记录不充分\n   - 支付网关依赖日志来进行事后审计和欺诈检测\n   - 日志缺失意味着安全审计不完整，可能隐藏恶意交易\n\n3. **暴露面评估**：\n   - 支付网关直接面向互联网暴露，属于极高关键度资产\n\n### 第四幕：LLM 推理与风险升级\n\n**核心评估发生**：AIForSec 的**AI 引擎核心（AI Engine Core）** 接收到上述信息，启动多链推理：\n\n**推理链 1：技术影响**\n> 虽然 CVE-2026-4141 的外部评级仅为\"低危\"，但在支付网关的上下文中，日志记录不充分意味着：\n> - 我们无法追踪一笔可疑的 100 万元转账发生了什么\n> - 恶意行为人可以在不留下充分日志痕迹的情况下进行交易操纱纵\n> - 事后取证和法律合规审计会面临关键证据缺失的问题\n\n**推理链 2：暴露面与影响**\n> 支付网关直接处理用户资金转移，属于\"业务最关键的资产\"。在这个场景中：\n> - 日志不充分导致的审计盲点 = 攻击检测能力下降\n> - 攻击检测能力下降 + 直接面向互联网 = 恶意交易可能被掩盖\n\n**推理链 3：风险等级升级**\n$$\\text{最终风险等级} = \\text{外部严重度} \\times \\text{组件关键度} \\times \\text{功能暴露系数} \\times \\text{审计缺失倍数}$$\n\n$$= 3.5 \\times 5 (\\text{Critical支付网关}) \\times 10 (\\text{日志是支付审计的核心}) \\times 4 (\\text{直接影响检测能力})$$\n\n$$= \\text{极高风险 (CRITICAL+)}$$\n\n**最终结论**：\n> ❌ **该漏洞在我们的产品上下文中构成极高风险**\n> \n> **原因**：虽然外部评级为低危，但该漏洞会直接削弱支付网关的安全审计能力，导致恶意交易可能无法事后追踪。考虑到支付交易的金融价值和合规重要性，这个漏洞必须被立即修复。\n\n### 第五幕：预警邮件生成与发送\n\n**预警通知工具（Notification MCP，id:1227）** 根据上述分析，自动生成并发送以下预警邮件：\n\n---\n\n**收件人**（兼顾多种情报消费者）：安全负责人 (security.chief@company.com); 支付业务负责人 (payment.owner@company.com)  \n**发送时间**：2026-03-15 09:45  \n**优先级**：🔴 **CRITICAL - 立即处理**\n\n---\n\n### 邮件主题\n```\n🚨 高风险安全预警 [CVE-2026-4141]: 支付网关审计能力受损 - 需要紧急修复\n```\n\n### 邮件正文\n\n```\n亲爱的安全和业务负责人，\n\n系统在 2026-03-15 09:30 UTC+8 检测到一个关键风险，需要您立即采取行动。\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 风险评估结论\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n【漏洞编号】CVE-2026-4141\n【漏洞标题】log4j-core 2.19.0 中的日志记录不充分缺陷\n【外部评级】CVSS 3.5 (低危)\n【本系统风险等级】⚠️ CRITICAL+ (极高风险)\n【评估时间】2026-03-15 09:35 UTC+8\n\n### 为什么低危漏洞在我们系统中升级为极高风险？\n\n我们的系统在内部资产上下文中识别出以下信息：\n\n**受影响的产品**: 支付网关服务  \n**受影响的组件**: 交易日志模块（log4j-core v2.19.0）  \n**组件功能**: 记录所有支付交易日志（金额、账户、时间戳）和失败日志  \n**组件关键度**: ⭐⭐⭐⭐⭐ (CRITICAL - 业务最核心资产)\n\n**漏洞在本系统的影响推理**:\n\n1️⃣ [技术影响] 日志记录不充分\n   → 审计日志缺失或不完整\n\n2️⃣ [资产影响] 支付网关直接处理用户资金转移\n   → 审计日志缺失 = 无法追踪交易  \n   → 恶意交易可能被掩盖\n\n3️⃣ [暴露面] 支付网关直接面向互联网\n   → 攻击面广阔\n\n4️⃣ [最终风险] 恶意行为人可能通过伪造或绕过日志来隐藏欺诈交易\n   → 本系统的检测和追踪能力受损\n   → **金融风险极高**\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔧 立即消减措施\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n【优先级】P0 - 立即执行\n\n1. **升级 log4j-core 版本**\n   - 目标版本：log4j-core >= 2.20.0 (已验证修复该缺陷)\n   - 受影响模块：支付网关 → 交易日志模块\n   - 预计升级时间：4 小时\n   - 测试范围：支付链路端到端测试（包括异常边界）\n\n2. **临时缓解（升级前）**\n   - 加强支付网关的外部监控和异常检测\n   - 增加日志备份频率（外部写入不可修改的日志库）\n   - 启用额外的 WAF 规则检测异常交易模式\n\n3. **验证步骤**\n   ```bash\n   # 确认版本已升级\n   gradle dependencies | grep log4j-core\n   # 预期输出: log4j-core:2.20.0 或更高\n   \n   # 运行支付网关集成测试\n   ./run_payment_gateway_integration_tests.sh\n   ```\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📡 监控与检测措施\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n系统已启动以下持续监控，直到漏洞被修复：\n\n✅ **实时日志监控规则**\n- 检测支付网关日志中的异常模式：\n  * 短时间内大量日志缺失\n  * 高频率的交易失败未被正确记录\n  * 异常地址发起的大额交易\n\n✅ **审计事件监控**\n- 监控所有支付交易的完整性\n- 比较预期和实际日志数量（偏差告警）\n\n✅ **攻击检测**\n- 启用攻击模式 `CWE-778: Insufficient Logging` 检测规则\n- 交易金额 > ¥100,000 且日志可能缺失 → 立即告警\n\n✅ **检测仪表盘**\n- 实时监控地址: https://platform.company.com/monitoring/payment-gateway-health\n- 预警阈值: 任何日志缺失事件\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📚 附件：证据链\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n【追踪 ID】vuln-assess-2026-3-15-0935-cvecfe62a401\n【风险评估报告】https://platform.company.com/risk-assessments/vuln-assess-2026-3-15-0935\n【证据清单】见下方 STIX 数据模型章节\n【应急处置时间窗口】建议在 48 小时内完成升级\n\n评估人员：AIForSec 自动化风险引擎  \n评估依据：STIX 2.1 威胁情报标准 + 内部资产图谱  \n下次评估：升级验证后自动触发再评估\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n**如果您有任何疑问，请回复此邮件或登录平台查看详细分析，谢谢。**\n```\n\n---\n\n### 第六幕：负责人响应与应急处置\n\n邮件发送后的 5 分钟内：\n\n1. **支付业务负责人** 收到邮件并登录平台，查看详细证据链\n2. **安全负责人** 启动应急会议，评估升级的影响范围\n3. **开发团队** 立即开始准备 log4j-core 版本升级\n4. **运维负责人** 为升级工作预留测试环境和发布时间窗口\n\n在接下来的 3 小时内，完成以下步骤：\n- ✅ 代码仓库中 log4j-core 版本从 2.19.0 升级到 2.20.0\n- ✅ 运行所有支付链路的端到端集成测试\n- ✅ 在灰度环境验证修复无误\n- ✅ 向平台上报\"漏洞已修复\"，系统自动重新评估风险等级（降低到低危）\n\n---\n\n## 关键要点总结\n\n| 要点 | 说明 |\n|---|---|\n| **外部 vs 内部风险** | 同一个漏洞在不同的产品上下文中风险等级可能完全不同 |\n| **推理链**清晰 | 系统明确阐述从\"低危漏洞\"升级到\"极高风险\"的完整因果链路 |\n| **可追溯**的证据 | 每个推理步骤都有对应的资产、功能和关系数据支撑 |\n| **立即可执行** | 邮件中的消减措施、监控告警和验证步骤都是\"可开箱即用\"的 |\n| **自动化闭环** | 从漏洞推送、评估、预警、修复、重评估全程自动化 |\n\n---\n\n## 业务价值\n\n✅ **降低金融风险**：通过上下文感知的漏洞评估，确保真正关键的漏洞不被遗漏  \n✅ **减少响应时间**：自动推理和证据清晰，负责人可以在 5 分钟内启动应急  \n✅ **提高审计合规**：完整的评估链路和证据链为监管审查提供可追溯的证据  \n✅ **优化修复优先级**：将有限的修复资源集中在真正高风险的漏洞上\n"
+}
+]
+},
+{
+"id": "1223",
+"name": "VS1-E2E_持续安全交付闭环_端到端用户故事"
+,"type": "ArchiMate_ValueStream"
+,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/VS1-E2E_持续安全交付闭环_端到端用户故事"
+,"attributes": [
+{
+"name": "userstory",
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\design\\\\userstories\\\\value_stream_aligned\\\\VS1-E2E_持续安全交付闭环_端到端用户故事.md\n\n"
+}
+]
+},
+{
+"id": "1224",
+"name": "VS4-E2E_环境感知监控闭环_端到端用户故事"
+,"type": "ArchiMate_ValueStream"
+,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/VS4-E2E_环境感知监控闭环_端到端用户故事"
+,"attributes": [
+{
+"name": "userstory",
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\design\\\\userstories\\\\value_stream_aligned\\\\VS4-E2E_环境感知监控闭环_端到端用户故事.md\n\n# VS4-E2E 环境感知监控闭环（端到端用户故事）\n\n> **前置依赖约定**：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent 与 OPENCTI 平台的核心操作模式，以及 STIX 2.1 与 Notification 的强制架构准则。\n\n## 价值流视角\n- **价值流**: 价值流 4：环境感知监控闭环 (Context-Aware Monitoring Loop)\n- **定义**: 这是一个 **独立的、连接性** 的价值流，将设计态的威胁 (Design) 转化为运行态的检测能力 (Operations)。\n\n## 用户故事（跨流程）\n- **作为**: 各类情报消费者及情报分析师\n- **我希望**: 在系统帮助下可自动化地把抽象层面识别的设计缺陷转换为业务级别安全监控规则\n- **以便**: 情报消费者能从被激活的早期预案接收高保真的定制化溯源情报，不必淹没在噪音内\n\n## 验收标准\n1. **自动翻译**: 输入 `Attack-Pattern` (针对特定组件) 自动生成 `Detection Rule` (Sigma/SPL)。\n2. **上下文绑定**: 告警信息中包含设计文档中的 `Security-Goal` 与 `Asset` 上下文。\n3. **闭环反馈**: 运营阶段的命中情况能反哺威胁模型的准确性。\n\n## SHOWCASE（端到端）\n### 场景\n新上线的 \"User-Profile-Service\" 在 TARA 分析中识别出 \"BOLA (Broken Object Level Authorization)\" 风险。\n系统自动生成一条专门监控该服务 `GET /api/user/{id}` 接口参数与 JWT Token 不一致的检测规则。\n\n### 执行链路\n1. **Design (VS1)**: 威胁建模识别出攻击模式 `sdo:Attack-Pattern (BOLA)` 针对组件 `sdo:Software (User-Profile-Service)`。\n2. **Translation (VS4)**: 规则引擎分析攻击模式特征，结合组件技术栈 (FastAPI + Postgres)，生成 **Sigma 规则**。\n3. **Deployment**: 规则自动下发至底座 `Situational Awareness` 模块。\n4. **Detect (VS2)**: 攻击者尝试修改 URL ID 访问他人数据。\n5. **Alert**: 触发 \"Context-Aware Alert\"，明确指出违反了设计阶段的 \"数据隔离目标\"。\n\n### 业务价值\n- **零配置上线**: 业务上线即具备专用监控能力。\n- **高保真告警**: 告警基于特定业务逻辑，而非通用攻击特征，误报率极低。\n\n## 交互流程图\n```mermaid\nsequenceDiagram\n    participant Architect as 安全架构师\n    participant Design as VS1:威胁建模 (TARA)\n    participant Engine as VS4:规则引擎 (Rule Gen)\n    participant Graph as 知识图谱 (Neo4j)\n    participant Ops as VS2:态势感知 (Sighting)\n    \n    note over Architect, Design: 1. 设计阶段威胁输入 (Prediction)\n    Architect->>Design: 定义组件与潜在威胁 (Threat Model)\n    Design->>Graph: 存储 Attack-Pattern & Security-Goal\n    \n    note over Design, Engine: 2. 规则自动转化 (Translation)\n    Engine->>Graph: 订阅新增 Attack-Pattern\n    Engine->>Engine: 分析组件技术栈 (FastAPI/Postgres)\n    Engine->>Engine: 匹配检测模板 (Sigma/SPL)\n    Engine->>Graph: 生成关联 Indicator (Internal-Rule)\n    \n    note over Engine, Ops: 3. 规则下发与监控 (Detection)\n    Graph->>Ops: 实时同步 Indicator 规则库\n    Ops->>Ops: 实施监控 (Context-Aware Alerting)\n    \n    note over Ops, Design: 4. 闭环反馈 (Loop to Architect)\n    Ops->>Graph: 写入 Sighting (规则命中)\n    Graph-->>Design: 统计威胁命中率\n    Design->>Architect: 验证威胁模型准确性 (True Positive)\n    Architect->>Design: 调整威胁优先级/新增威胁\n```\n\n## 数据流 (Data Flow)\n```\nsdo:Attack-Pattern (Predictive)\n       + \nsdo:Software (Component Metadata)\n       ↓\n[Detection Rule Generator]\n       ↓\nsdo:Indicator (Internal-Rule)\n       ↓\n[Situational Awareness]\n```\n"
+}
+]
+},
+{
+"id": "1225",
+"name": "VS2-E2E_威胁运营与响应闭环_端到端用户故事"
+,"type": "ArchiMate_ValueStream"
+,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/VS2-E2E_威胁运营与响应闭环_端到端用户故事"
+,"attributes": [
+{
+"name": "userstory"
+,"description": "design\\userstories\\value_stream_aligned\\VS2-E2E_威胁运营与响应闭环_端到端用户故事.md"
+}
+]
+},
+{
+"id": "1226",
+"name": "业务流程中所有数据都必须是OPENCTI平台中的STIX2.1标准数据"
+,"type": "ArchiMate_Principle"
+,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/业务流程中所有数据都必须是OPENCTI平台中的STIX2.1标准数据"
+},
+{
+"id": "1227",
+"name": "Notification MCP"
+,"type": "Class"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/Notification MCP"
+,"description": "`NotificationTool` 的发送通道采用EMAIL发送，相关参数：\r\n    # Email / SMTP Configuration\r\n    SMTP_SERVER: str = \"smtp.126.com\"\r\n    SMTP_PORT: int = 25\r\n    SMTP_USER: Optional[str] = \"hdhscu@126.com\"\r\n    SMTP_PASSWORD: Optional[str] = \"YMTKyMMt4Gu3x3sE\"\r\n    SMTP_SENDER: str = \"hdhscu@126.com\"\r\n    ALERT_RECIPIENT: str = \"hdhscu@126.com\""
+}
+],
+"relationships": [
+{
+"id":"1079"
+,"statement":"ai4sec_agent --(aggregates)--> DIFY"
+,"name":"aggregates"
+,"source_id":"1214"
+,"target_id":"1212"
+,"source_name":"ai4sec_agent"
+,"target_name":"DIFY"
+},
+{
+"id":"1080"
+,"statement":"SKILL --(aggregates)--> DIFY"
+,"name":"aggregates"
+,"source_id":"1213"
+,"target_id":"1212"
+,"source_name":"SKILL"
+,"target_name":"DIFY"
+},
+{
+"id":"1081"
+,"statement":"ai4sec_agent --(uses)--> SKILL"
+,"name":"uses"
+,"source_id":"1214"
+,"target_id":"1213"
+,"source_name":"ai4sec_agent"
+,"target_name":"SKILL"
+},
+{
+"id":"1082"
+,"statement":"ai4sec_agent --(access opencti stix data)--> ai4sec_opencti_mcp"
+,"name":"access opencti stix data"
+,"source_id":"1214"
+,"target_id":"1215"
+,"source_name":"ai4sec_agent"
+,"target_name":"ai4sec_opencti_mcp"
+},
+{
+"id":"1083"
+,"statement":"ai4sec_opencti_mcp --(access情报数据)--> OpenCTI platform"
+,"name":"access情报数据"
+,"source_id":"1215"
+,"target_id":"1216"
+,"source_name":"ai4sec_opencti_mcp"
+,"target_name":"OpenCTI platform"
+},
+{
+"id":"1084"
+,"statement":"外部信息爬取AGENT --(通过connector同步情报)--> OpenCTI platform"
+,"name":"通过connector同步情报"
+,"source_id":"1217"
+,"target_id":"1216"
+,"source_name":"外部信息爬取AGENT"
+,"target_name":"OpenCTI platform"
+},
+{
+"id":"1085"
+,"statement":"外部信息爬取AGENT --(主动爬取)--> 外部网站"
+,"name":"主动爬取"
+,"source_id":"1217"
+,"target_id":"1218"
+,"source_name":"外部信息爬取AGENT"
+,"target_name":"外部网站"
+},
+{
+"id":"1086"
+,"statement":"OpenCTI platform --(主动推送STIX BUNDLE情报信息)--> ai4sec_agent"
+,"name":"主动推送STIX BUNDLE情报信息"
+,"source_id":"1216"
+,"target_id":"1214"
+,"source_name":"OpenCTI platform"
+,"target_name":"ai4sec_agent"
+},
+{
+"id":"1087"
+,"statement":"情报分析师 --(手工录入情报)--> OpenCTI platform"
+,"name":"手工录入情报"
+,"source_id":"1219"
+,"target_id":"1216"
+,"source_name":"情报分析师"
+,"target_name":"OpenCTI platform"
+},
+{
+"id":"1088"
+,"statement":"各类情报消费者 --(消费情报)--> ai4sec_agent"
+,"name":"消费情报"
+,"source_id":"1220"
+,"target_id":"1214"
+,"source_name":"各类情报消费者"
+,"target_name":"ai4sec_agent"
+},
+{
+"id":"1089"
+,"statement":"ai4sec_agent --(发送预警通知)--> Notification MCP"
+,"name":"发送预警通知"
+,"source_id":"1214"
+,"target_id":"1227"
+,"source_name":"ai4sec_agent"
+,"target_name":"Notification MCP"
+}
+],
+"views": [
+{
+"view_id": "159",
+"view_name": "StrategyLayerAndMotivationAspect"
+,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect"
+,"parent_element_id": "1207"
+,"parent_element_name": "StrategyLayerAndMotivationAspect"
+,"included_elements": [
+"1222",
+"1223",
+"1221",
+"1224",
+"1225",
+"1226"
+]
+,"included_relationships": [
+
+]
+},
+{
+"view_id": "160",
+"view_name": "BusinessLayer"
+,"browser_path": "Model/System/BusinessLayer/BusinessLayer/BusinessLayer"
+,"parent_element_id": "1208"
+,"parent_element_name": "BusinessLayer"
+,"included_elements": [
+
+]
+,"included_relationships": [
+
+]
+},
+{
+"view_id": "164",
+"view_name": "ApplicationLayer"
+,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/ApplicationLayer"
+,"parent_element_id": "1209"
+,"parent_element_name": "ApplicationLayer"
+,"included_elements": [
+"1212",
+"1213",
+"1214",
+"1215",
+"1216",
+"1217",
+"1218",
+"1219",
+"1220",
+"1227"
+]
+,"included_relationships": [
+"1079",
+"1080",
+"1081",
+"1082",
+"1083",
+"1084",
+"1085",
+"1086",
+"1087",
+"1088",
+"1089"
+]
+},
+{
+"view_id": "162",
+"view_name": "TechnologyLayer"
+,"browser_path": "Model/System/TechnologyLayer/TechnologyLayer/TechnologyLayer"
+,"parent_element_id": "1210"
+,"parent_element_name": "TechnologyLayer"
+,"included_elements": [
+
+]
+,"included_relationships": [
+
+]
+},
+{
+"view_id": "163",
+"view_name": "ProjectManagement"
+,"browser_path": "Model/System/ProjectManagement/ProjectManagement/ProjectManagement"
+,"parent_element_id": "1211"
+,"parent_element_name": "ProjectManagement"
+,"included_elements": [
+
+]
+,"included_relationships": [
+
+]
+},
+{
+"view_id": "158",
+"view_name": "SystemArchitecture"
+,"browser_path": "Model/System/SystemArchitecture"
+,"included_elements": [
+"1207",
+"1208",
+"1209",
+"1210",
+"1211"
+]
+,"included_relationships": [
+
+]
+}
+]
+}
