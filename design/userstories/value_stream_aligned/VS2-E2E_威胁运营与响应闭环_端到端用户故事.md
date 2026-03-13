@@ -1,61 +1,57 @@
-# VS2-E2E 威胁运营与响应闭环（端到端用户故事）
+# VS2-E2E 威胁运营与响应闭环端到端用户故事
 
-> **前置依赖约定**：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent 与 OPENCTI 平台的核心操作模式，以及 STIX 2.1 与 Notification 的强制架构准则。
+> 前置依赖约定：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent、OPENCTI、Notification MCP 与 STIX 2.1 的统一约束。
 
-## 价值流视角
-- 价值流：价值流 2：威胁运营与响应闭环
+## 1、概要
 
-## 用户故事（跨流程）
-- 作为：情报消费者（如 SOC 经理）与情报分析师
-- 我希望：借助情报分析师的智能规则定义与处置流，将事件溯源处置全流程纳入自动化
-- 以便：情报消费者消费预判结果快速闭环，并将反馈提取为新维度情报回灌提升检出率
+本故事面向情报分析师与 SOC 经理，描述告警进入系统后，DIFY Agent 如何编排 OPENCTI、处置知识和通知链路，将原始观测升级为可执行的事件响应闭环。核心目标是把处置过程中的每一步都固化为 STIX 对象与关系，确保后续复盘、二次检索和规则回灌都能复用。
 
-## 验收标准
-1. 从 `Observed-Data/Network-Traffic` 可生成 `Incident` 并触发处置。
-2. 处置阶段输出 `Course-of-Action` 与 IR 报告。
-3. 复盘阶段产出新 `Indicator`/`Attack-Pattern` 并回灌检测环节。
-4. 可量化闭环指标：告警到处置耗时、处置成功率、回灌命中率。
+## 2、执行全景图 (DIFY & OPENCTI 协作流)
 
-## SHOWCASE（端到端）
-### 场景
-凌晨出现可疑横向移动，值班团队需在 30 分钟内完成遏制与初步复盘。
-
-### 输入
-- SIEM 日志与流量快照
-- 外部威胁指标（Indicator）
-
-### 执行链路
-1. 自动分类识别高危 Sighting，并升级为 Incident。
-2. 编排执行隔离主机、封禁 IOC、收集取证。
-3. 输出 IR 报告与时间线。
-4. 复盘提炼出 2 个新 IOC 与 1 条 TTP，回灌检测策略。
-
-### 输出
-- 处置状态：`Contained`
-- 回灌状态：`Enabled`
-- 关键指标：MTTD 下降、MTTR 下降
-
-### 业务操作流程图 (含 DIFY 与 OPENCTI 交互)
-`mermaid
+```mermaid
 sequenceDiagram
-    participant SIEM as NDR/SIEM 集成 (外部触发)
-    participant Agent as DIFY Agent (ai4sec_agent 编排大脑)
-    participant CTI as OPENCTI 平台 (STIX 响应底座)
-    participant SOC as 各类情报消费者 (SOC 经理)
+    actor Analyst as 情报分析师
+    actor Consumer as 情报消费者(SOC经理)
+    participant SIEM as SIEM/NDR
+    participant Agent as DIFY Agent(ai4sec_agent)
+    participant OpenCTIMCP as ai4sec_opencti_mcp
+    participant CTI as OPENCTI Platform
+    participant Notify as Notification MCP
 
-    SIEM->>Agent: (通过预置模板 webhook) 推送安全警报快照
-    Note right of SIEM: 输入: 警报描述、可疑流量和资产IP
-    
-    Agent->>CTI: (ai4sec_opencti_mcp) 落盘前置目击并查询上下文
-    Note right of Agent: 提取/录入 STIX (输入):<br/>Observed-Data (流量快照)<br/>Indicator (IoC 匹配)
-    
-    CTI-->>Agent: 下发已知的高阶 APT Attack-Pattern 与 关联黑库资产
-    
-    Agent->>Agent: 智能流决策大模型推演遏制策略 (自动化封禁或隔离判定)
-    
-    Agent->>CTI: (ai4sec_opencti_mcp) 更新防御记录并建立事件档案
-    Note left of CTI: 回储 STIX (输出):<br/>Incident (确认的高危事件)<br/>Course-of-Action (响应实施表)
-    
-    Agent-->>SOC: (Notification MCP) 发送响应分诊研判公报与复盘结论报告
-    Note right of SOC: SOC 经理可通过 OpenCTI 的关联图谱反哺产出全新的威胁画像
-`
+    Analyst->>Agent: 预置告警分级、处置模板和升级阈值
+    Note right of Analyst: 模板参数:\nIndicator{pattern, valid_from}\nCourse-of-Action{name, playbook_id}
+
+    SIEM->>Agent: webhook 推送告警快照与流量证据
+    Note right of SIEM: 输入事实:\nObserved-Data{first_observed, last_observed, number_observed}\nNetwork-Traffic{src_ref, dst_ref, protocols}\nIndicator{pattern_type, pattern}
+
+    Agent->>OpenCTIMCP: 查询命中 IOC、攻击技战术和历史事件
+    OpenCTIMCP->>CTI: 按对象与关系检索图谱
+    CTI-->>OpenCTIMCP: 返回 Bundle{id, objects[]}
+    Note left of CTI: 返回对象:\nAttack-Pattern{name, x_mitre_id}\nIntrusion-Set{name, aliases}\nIncident{name, severity}
+    OpenCTIMCP-->>Agent: 返回处置上下文
+
+    Agent->>Agent: 研判事件等级并生成响应动作
+    Note right of Agent: 推理输出:\nIncident{name, severity, first_seen}\nCourse-of-Action{name, description, priority}
+
+    Agent->>OpenCTIMCP: 写回事件档案与处置结果
+    OpenCTIMCP->>CTI: 更新 Incident 与关联对象
+    Note left of CTI: 输出对象:\nIncident{name, severity, status}\nNote{abstract, content}\nRelationship{relationship_type="related-to"}
+
+    Agent->>Notify: 下发分诊结论、隔离动作和复盘摘要
+    Notify-->>Consumer: 发送响应指令和证据链接
+    Consumer->>CTI: 查看 Incident 时间线与关联图谱
+```
+
+## 3、故事：横向移动告警的运营与响应闭环
+
+### 第一幕：告警快照进入 DIFY Agent
+
+深夜时段，SIEM 检测到来自办公网段到生产跳板机的异常横向移动尝试，并通过 webhook 将 `Observed-Data{number_observed=17}`、`Network-Traffic{src_ref="host-A", dst_ref="bastion-01", protocols=["smb"]}` 和命中的 `Indicator{pattern="[ipv4-addr:value = '10.1.2.7']"}` 一并推送给 DIFY Agent。
+
+### 第二幕：OPENCTI 提供事件上下文与可执行处置
+
+DIFY Agent 通过 `ai4sec_opencti_mcp` 检索与该 IOC 相关的 `Attack-Pattern`、`Intrusion-Set` 和既有 `Incident`，发现该模式与一次历史横向移动活动高度相似。Agent 随即结合预置剧本生成新的 `Course-of-Action`，包括隔离主机、封禁 IOC、抓取关键内存证据和冻结高风险账号。
+
+### 第三幕：SOC 经理接收结果并闭环回灌
+
+系统把新建的 `Incident{name="possible-lateral-movement"}`、处置 `Note` 和相关 `Relationship` 写入 OPENCTI，再由 Notification MCP 把“已隔离、待复核、需复盘”的行动摘要同步给 SOC 经理。SOC 经理在 OPENCTI 中核查完整时间线，确认新产生的 IOC 是否需要转化为新的 `Indicator` 以回灌检测链路。

@@ -1,308 +1,60 @@
-# 用户故事：低危漏洞触发高风险评估并发预警邮件
+# VS3-E2E 漏洞风险评估与预警用户故事
 
-> **前置依赖约定**：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent 与 OPENCTI 平台的核心操作模式，以及 STIX 2.1 与 Notification 的强制架构准则。
+> 前置依赖约定：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent、OPENCTI、Notification MCP 与 STIX 2.1 的统一约束。
 
-<!-- @ArchitectureID: 1068 -->
+## 1、概要
 
-## 概要
-本例详述了系统作为“替代性”的情报分析师，如何把初步外部威胁结合内网调用图谱等要素，自动化提纯为定制的结构化高级预警，并最终由 Notification MCP 分发给特定的情报消费者（如系统负责人与业务团队）。
+本故事面向情报分析师、业务负责人和安全负责人，描述一个外部评级并不高的漏洞，如何先被统一接入内部 OPENCTI，再由 DIFY Agent 仅从内部 OPENCTI 拉取标准化 STIX 数据，结合内部业务上下文、资产关键度和暴露面完成高风险判定，并通过 OPENCTI 沉淀完整证据链后自动触发预警。
 
----
+## 2、执行全景图 (DIFY & OPENCTI 协作流)
 
-## 自动化重塑执行全景图 (DIFY & OPENCTI 协作流)
-本高阶安全响应场景不仅需要人，全链路底层极大依靠 DIFY Agent 的大脑调度、大模型逻辑切分以及与 OPENCTI 的对象实时存储和联动刷新，输入输出的实盘流转如下：
-
-`mermaid
+```mermaid
 sequenceDiagram
-    participant Webhook as 外部漏洞采集源
-    participant Agent as DIFY Agent (ai4sec_agent)
-    participant CTI as OPENCTI 平台 (STIX 全源平台)
-    participant User as 各类情报消费者 (支付业务团队与安全侧)
+   actor Analyst as 情报分析师
+   actor Consumer as 情报消费者(业务负责人/安全负责人)
+   participant Webhook as 漏洞推送源
+   participant CTI as OPENCTI Platform
+   participant Agent as DIFY Agent(ai4sec_agent)
+   participant OpenCTIMCP as ai4sec_opencti_mcp
+   participant Notify as Notification MCP
 
-    Webhook->>Agent: (opencti_webhook_signal_template) 触发系统流
-    Note right of Webhook: STIX (输入):<br/>Report/Vulnerability (源评价: 低危 cvss:3.5)
+   Analyst->>CTI: 配置漏洞映射规则与升级策略
+   Note right of Analyst: 策略对象:\nVulnerability{name, cvss_score}\nOpinion{opinion, explanation}\nNote{abstract, content}
 
-    Agent->>CTI: 请求该漏洞触达组件的网络纵深与数据关键度
-    Note right of Agent: 发送 STIX 探针查询:<br/>Software (log4j-core:2.19.0)
+   Webhook->>CTI: 推送漏洞事件与受影响组件信息
+   Note right of Webhook: 外部仅对接内部 OPENCTI:\nVulnerability{name="CVE-2026-4141", cvss_score=3.5}\nSoftware{name="log4j-core", version="2.19.0"}
 
-    CTI-->>Agent: 原样送回图谱片段
-    Note left of CTI: 返回 STIX 图谱要素:<br/>Infrastructure (支付网关集群,含超高权值)<br/>Identity (业务Owner信息)
+   CTI-->>Agent: 下发待研判漏洞与关联 STIX Bundle
+   Note left of CTI: 提供给 Agent 的内部情报:\nBundle{id, objects[]}\nVulnerability{name, description, cvss_score}
 
-    Agent->>Agent: Dify 组织提示词模板由大模型重构评估,发掘日志阻断带来的高额风险
+   Agent->>OpenCTIMCP: 查询内部组件调用链、业务关键度和暴露面
+   OpenCTIMCP->>CTI: 检索 Software、Infrastructure、Identity 关联
+   CTI-->>OpenCTIMCP: 返回资产图谱与既有历史记录
+   Note left of CTI: 返回对象:\nInfrastructure{name="payment-gateway", environment="prod"}\nIdentity{name="payment-owner", role="service-owner"}\nRelationship{relationship_type="uses"}
+   OpenCTIMCP-->>Agent: 返回内部上下文
 
-    Agent->>CTI: 落盘极高危害分析结果与关联证据链条
-    Note left of CTI: 更新覆写 STIX (输出):<br/>Relationship (Vulnerability affects Infrastructure)<br/>Vulnerability (评级修订为: CRITICAL+)
+   Agent->>Agent: 执行上下文感知风险升级推理
+   Note right of Agent: 推理输出:\nVulnerability{x_opencti_score, severity}\nOpinion{opinion="critical", explanation}\nCourse-of-Action{name, priority}
 
-    Agent-->>User: 将包含详细执行动作的报警借助 Notification MCP 同步触达
-    Note right of User: 业务消费方直达 OpenCTI 验证 STIX 关系链证实该定级，启动应急
-`
+   Agent->>OpenCTIMCP: 写回升级后的漏洞评估与证据链
+   OpenCTIMCP->>CTI: 更新 Vulnerability、Opinion、Relationship
+   Note left of CTI: 输出对象:\nVulnerability{name, severity="critical+"}\nRelationship{source_ref, target_ref, relationship_type="affects"}\nCourse-of-Action{name, description, priority}
 
-## 故事：支付网关中的日志记录不充分漏洞升级为极高风险
-
-### 第一幕：漏洞推送进入系统
-
-**时间**：2026-03-15 上午 09:30（UTC+8）
-
-OpenCTI 威胁情报平台检测到一个新发布的漏洞编号 **CVE-2026-4141**，属于常见的开源日志库 `log4j-core v2.19.0` 中的一个日志信息泄露缺陷。该漏洞严重度被外部评为 **CVSS 3.5（低危）**，因为它只在特定配置下触发，且影响面相对有限。
-
-OpenCTI 立即通过 webhook 将漏洞通知推送给 AIForSec 系统：
-
-```json
-{
-  "event_type": "vulnerability_created",
-  "cve_id": "CVE-2026-4141",
-  "title": "Improper Logging in log4j-core 2.19.0",
-  "external_references": [
-    {
-      "source_name": "NVD",
-      "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-4141"
-    }
-  ],
-  "affected_packages": [
-    {
-      "name": "log4j-core",
-      "version": "2.19.0",
-      "ecosystem": "maven"
-    }
-  ]
-}
+   Agent->>Notify: 生成并发送预警
+   Notify-->>Consumer: 发送邮件与整改动作
+   Consumer->>CTI: 复核证据链并启动应急处理
 ```
 
-### 第二幕：情报摄取与初步归一化
+## 3、故事：低危漏洞在支付网关上下文中被升级为极高风险
 
-AIForSec 的 `OpenCTITool` 接收到 webhook 推送后，系统的**威胁情报插件（Threat Intel Plugin）** 自动启动数据摄取流程：
+### 第一幕：外部漏洞事件进入系统
 
-1. **数据拉取**：通过 ai4sec_opencti_mcp 向 OpenCTI 查询 CVE-2026-4141 的完整信息，包括：
-   - 漏洞描述与技术细节（不充分的日志记录会导致安全审计日志缺失）
-   - 受影响的软件版本范围
-   - 已知的攻击向量（需要特定的日志配置才能触发）
-   - 相关的 CVSS 评分与严重度
+外部漏洞推送源上报 `Vulnerability{name="CVE-2026-4141", cvss_score=3.5, description="insufficient logging"}`，并同时携带受影响组件 `Software{name="log4j-core", version="2.19.0"}`。但这些外部情报不会直接进入 DIFY Agent，而是先统一写入内部 OPENCTI，由情报分析师在 OPENCTI 中预先配置的漏洞映射和升级策略进行标准化沉淀。
 
-2. **结构化归一化**：威胁情报插件将这些信息转换为 STIX 2.1 `Vulnerability` 对象，并标注：
-   - 组件名称：`log4j-core`
-   - 版本：`2.19.0`
-   - 功能影响：日志记录功能的不充分审计日志输出
-   - 代码级影响：基于 SBOM，该版本被集成处调用
+### 第二幕：DIFY Agent 调取内部业务上下文并重算风险
 
-### 第三幕：内部资产关系查询
+DIFY Agent 只通过 `ai4sec_opencti_mcp` 从内部 OPENCTI 拉取标准化后的 `Vulnerability`、`Software` 以及相关 `Relationship`，随后查询到该组件运行在 `Infrastructure{name="payment-gateway", environment="prod"}` 上，且与 `Identity{name="payment-owner", role="service-owner"}` 和关键支付审计链路存在 `Relationship{relationship_type="uses"}`。Agent 基于“支付交易可审计性下降”等上下文，生成新的 `Opinion{opinion="critical"}` 与对应 `Course-of-Action`，将漏洞风险从外部低危提升为企业内部极高风险。
 
-**关键决策点**：此时一个普通的安全工具可能会就此停止分析，记录"低危漏洞"并存档。但 AIForSec 的**统一数据访问层（DAL）** 开始执行资产关系查询：
+### 第三幕：业务负责人和安全负责人接收带证据的预警
 
-1. **查询内部组件使用关系**：
-   ```
-   Q: "我们的产品中哪些部件使用了 log4j-core v2.19.0？"
-   
-   A: [
-     {
-       "product": "支付网关服务 (Payment Gateway)",
-       "component": "log4j-core v2.19.0",
-       "sub_component": "交易日志模块",
-       "feature_usage": [
-         "记录所有支付交易（金额、用户、时间戳）",
-         "记录失败的支付尝试和错误信息"
-       ],
-       "criticality": "CRITICAL"
-     }
-   ]
-   ```
-
-2. **功能影响分析**：
-   - 该漏洞会导致日志记录不充分
-   - 支付网关依赖日志来进行事后审计和欺诈检测
-   - 日志缺失意味着安全审计不完整，可能隐藏恶意交易
-
-3. **暴露面评估**：
-   - 支付网关直接面向互联网暴露，属于极高关键度资产
-
-### 第四幕：LLM 推理与风险升级
-
-**核心评估发生**：AIForSec 的**AI 引擎核心（AI Engine Core）** 接收到上述信息，启动多链推理：
-
-**推理链 1：技术影响**
-> 虽然 CVE-2026-4141 的外部评级仅为"低危"，但在支付网关的上下文中，日志记录不充分意味着：
-> - 我们无法追踪一笔可疑的 100 万元转账发生了什么
-> - 恶意行为人可以在不留下充分日志痕迹的情况下进行交易操纱纵
-> - 事后取证和法律合规审计会面临关键证据缺失的问题
-
-**推理链 2：暴露面与影响**
-> 支付网关直接处理用户资金转移，属于"业务最关键的资产"。在这个场景中：
-> - 日志不充分导致的审计盲点 = 攻击检测能力下降
-> - 攻击检测能力下降 + 直接面向互联网 = 恶意交易可能被掩盖
-
-**推理链 3：风险等级升级**
-$$\text{最终风险等级} = \text{外部严重度} \times \text{组件关键度} \times \text{功能暴露系数} \times \text{审计缺失倍数}$$
-
-$$= 3.5 \times 5 (\text{Critical支付网关}) \times 10 (\text{日志是支付审计的核心}) \times 4 (\text{直接影响检测能力})$$
-
-$$= \text{极高风险 (CRITICAL+)}$$
-
-**最终结论**：
-> ❌ **该漏洞在我们的产品上下文中构成极高风险**
-> 
-> **原因**：虽然外部评级为低危，但该漏洞会直接削弱支付网关的安全审计能力，导致恶意交易可能无法事后追踪。考虑到支付交易的金融价值和合规重要性，这个漏洞必须被立即修复。
-
-### 第五幕：预警邮件生成与发送
-
-**预警通知工具（Notification MCP，id:1227）** 根据上述分析，自动生成并发送以下预警邮件：
-
----
-
-**收件人**（兼顾多种情报消费者）：安全负责人 (security.chief@company.com); 支付业务负责人 (payment.owner@company.com)  
-**发送时间**：2026-03-15 09:45  
-**优先级**：🔴 **CRITICAL - 立即处理**
-
----
-
-### 邮件主题
-```
-🚨 高风险安全预警 [CVE-2026-4141]: 支付网关审计能力受损 - 需要紧急修复
-```
-
-### 邮件正文
-
-```
-亲爱的安全和业务负责人，
-
-系统在 2026-03-15 09:30 UTC+8 检测到一个关键风险，需要您立即采取行动。
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋 风险评估结论
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-【漏洞编号】CVE-2026-4141
-【漏洞标题】log4j-core 2.19.0 中的日志记录不充分缺陷
-【外部评级】CVSS 3.5 (低危)
-【本系统风险等级】⚠️ CRITICAL+ (极高风险)
-【评估时间】2026-03-15 09:35 UTC+8
-
-### 为什么低危漏洞在我们系统中升级为极高风险？
-
-我们的系统在内部资产上下文中识别出以下信息：
-
-**受影响的产品**: 支付网关服务  
-**受影响的组件**: 交易日志模块（log4j-core v2.19.0）  
-**组件功能**: 记录所有支付交易日志（金额、账户、时间戳）和失败日志  
-**组件关键度**: ⭐⭐⭐⭐⭐ (CRITICAL - 业务最核心资产)
-
-**漏洞在本系统的影响推理**:
-
-1️⃣ [技术影响] 日志记录不充分
-   → 审计日志缺失或不完整
-
-2️⃣ [资产影响] 支付网关直接处理用户资金转移
-   → 审计日志缺失 = 无法追踪交易  
-   → 恶意交易可能被掩盖
-
-3️⃣ [暴露面] 支付网关直接面向互联网
-   → 攻击面广阔
-
-4️⃣ [最终风险] 恶意行为人可能通过伪造或绕过日志来隐藏欺诈交易
-   → 本系统的检测和追踪能力受损
-   → **金融风险极高**
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔧 立即消减措施
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-【优先级】P0 - 立即执行
-
-1. **升级 log4j-core 版本**
-   - 目标版本：log4j-core >= 2.20.0 (已验证修复该缺陷)
-   - 受影响模块：支付网关 → 交易日志模块
-   - 预计升级时间：4 小时
-   - 测试范围：支付链路端到端测试（包括异常边界）
-
-2. **临时缓解（升级前）**
-   - 加强支付网关的外部监控和异常检测
-   - 增加日志备份频率（外部写入不可修改的日志库）
-   - 启用额外的 WAF 规则检测异常交易模式
-
-3. **验证步骤**
-   ```bash
-   # 确认版本已升级
-   gradle dependencies | grep log4j-core
-   # 预期输出: log4j-core:2.20.0 或更高
-   
-   # 运行支付网关集成测试
-   ./run_payment_gateway_integration_tests.sh
-   ```
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📡 监控与检测措施
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-系统已启动以下持续监控，直到漏洞被修复：
-
-✅ **实时日志监控规则**
-- 检测支付网关日志中的异常模式：
-  * 短时间内大量日志缺失
-  * 高频率的交易失败未被正确记录
-  * 异常地址发起的大额交易
-
-✅ **审计事件监控**
-- 监控所有支付交易的完整性
-- 比较预期和实际日志数量（偏差告警）
-
-✅ **攻击检测**
-- 启用攻击模式 `CWE-778: Insufficient Logging` 检测规则
-- 交易金额 > ¥100,000 且日志可能缺失 → 立即告警
-
-✅ **检测仪表盘**
-- 实时监控地址: https://platform.company.com/monitoring/payment-gateway-health
-- 预警阈值: 任何日志缺失事件
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📚 附件：证据链
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-【追踪 ID】vuln-assess-2026-3-15-0935-cvecfe62a401
-【风险评估报告】https://platform.company.com/risk-assessments/vuln-assess-2026-3-15-0935
-【证据清单】见下方 STIX 数据模型章节
-【应急处置时间窗口】建议在 48 小时内完成升级
-
-评估人员：AIForSec 自动化风险引擎  
-评估依据：STIX 2.1 威胁情报标准 + 内部资产图谱  
-下次评估：升级验证后自动触发再评估
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-**如果您有任何疑问，请回复此邮件或登录平台查看详细分析，谢谢。**
-```
-
----
-
-### 第六幕：负责人响应与应急处置
-
-邮件发送后的 5 分钟内：
-
-1. **支付业务负责人** 收到邮件并登录平台，查看详细证据链
-2. **安全负责人** 启动应急会议，评估升级的影响范围
-3. **开发团队** 立即开始准备 log4j-core 版本升级
-4. **运维负责人** 为升级工作预留测试环境和发布时间窗口
-
-在接下来的 3 小时内，完成以下步骤：
-- ✅ 代码仓库中 log4j-core 版本从 2.19.0 升级到 2.20.0
-- ✅ 运行所有支付链路的端到端集成测试
-- ✅ 在灰度环境验证修复无误
-- ✅ 向平台上报"漏洞已修复"，系统自动重新评估风险等级（降低到低危）
-
----
-
-## 关键要点总结
-
-| 要点 | 说明 |
-|---|---|
-| **外部 vs 内部风险** | 同一个漏洞在不同的产品上下文中风险等级可能完全不同 |
-| **推理链**清晰 | 系统明确阐述从"低危漏洞"升级到"极高风险"的完整因果链路 |
-| **可追溯**的证据 | 每个推理步骤都有对应的资产、功能和关系数据支撑 |
-| **立即可执行** | 邮件中的消减措施、监控告警和验证步骤都是"可开箱即用"的 |
-| **自动化闭环** | 从漏洞推送、评估、预警、修复、重评估全程自动化 |
-
----
-
-## 业务价值
-
-✅ **降低金融风险**：通过上下文感知的漏洞评估，确保真正关键的漏洞不被遗漏  
-✅ **减少响应时间**：自动推理和证据清晰，负责人可以在 5 分钟内启动应急  
-✅ **提高审计合规**：完整的评估链路和证据链为监管审查提供可追溯的证据  
-✅ **优化修复优先级**：将有限的修复资源集中在真正高风险的漏洞上
+系统把升级后的 `Vulnerability`、`Relationship(affects)`、`Course-of-Action` 和解释性 `Note` 写入 OPENCTI，再由 Notification MCP 发送邮件给支付业务负责人和安全负责人。两类消费者可以直接在 OPENCTI 中看到“漏洞影响了什么系统、为什么升高风险、该先做什么处置”的完整证据链，而不是只收到一个孤立的 CVE 编号。

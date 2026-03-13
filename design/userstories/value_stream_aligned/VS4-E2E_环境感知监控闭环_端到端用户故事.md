@@ -1,70 +1,57 @@
-# VS4-E2E 环境感知监控闭环（端到端用户故事）
+# VS4-E2E 环境感知监控闭环端到端用户故事
 
-> **前置依赖约定**：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent 与 OPENCTI 平台的核心操作模式，以及 STIX 2.1 与 Notification 的强制架构准则。
+> 前置依赖约定：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent、OPENCTI、Notification MCP 与 STIX 2.1 的统一约束。
 
-## 价值流视角
-- **价值流**: 价值流 4：环境感知监控闭环 (Context-Aware Monitoring Loop)
-- **定义**: 这是一个 **独立的、连接性** 的价值流，将设计态的威胁 (Design) 转化为运行态的检测能力 (Operations)。
+## 1、概要
 
-## 用户故事（跨流程）
-- **作为**: 各类情报消费者及情报分析师
-- **我希望**: 在系统帮助下可自动化地把抽象层面识别的设计缺陷转换为业务级别安全监控规则
-- **以便**: 情报消费者能从被激活的早期预案接收高保真的定制化溯源情报，不必淹没在噪音内
+本故事面向情报分析师与安全运营团队，描述如何把设计期识别出的威胁模式转换为运行期可执行的环境感知监控规则。核心不是生成一条普通告警，而是让 DIFY Agent 基于 OPENCTI 中的设计上下文、资产关系和既有防御知识，产出带业务语义的监控 `Indicator`，并把命中结果继续反馈回情报图谱。
 
-## 验收标准
-1. **自动翻译**: 输入 `Attack-Pattern` (针对特定组件) 自动生成 `Detection Rule` (Sigma/SPL)。
-2. **上下文绑定**: 告警信息中包含设计文档中的 `Security-Goal` 与 `Asset` 上下文。
-3. **闭环反馈**: 运营阶段的命中情况能反哺威胁模型的准确性。
+## 2、执行全景图 (DIFY & OPENCTI 协作流)
 
-## SHOWCASE（端到端）
-### 场景
-新上线的 "User-Profile-Service" 在 TARA 分析中识别出 "BOLA (Broken Object Level Authorization)" 风险。
-系统自动生成一条专门监控该服务 `GET /api/user/{id}` 接口参数与 JWT Token 不一致的检测规则。
-
-### 执行链路
-1. **Design (VS1)**: 威胁建模识别出攻击模式 `sdo:Attack-Pattern (BOLA)` 针对组件 `sdo:Software (User-Profile-Service)`。
-2. **Translation (VS4)**: 规则引擎分析攻击模式特征，结合组件技术栈 (FastAPI + Postgres)，生成 **Sigma 规则**。
-3. **Deployment**: 规则自动下发至底座 `Situational Awareness` 模块。
-4. **Detect (VS2)**: 攻击者尝试修改 URL ID 访问他人数据。
-5. **Alert**: 触发 "Context-Aware Alert"，明确指出违反了设计阶段的 "数据隔离目标"。
-
-### 业务价值
-- **零配置上线**: 业务上线即具备专用监控能力。
-- **高保真告警**: 告警基于特定业务逻辑，而非通用攻击特征，误报率极低。
-
-## 交互流程图
 ```mermaid
 sequenceDiagram
-    participant Design as VS1架构输出结果
-    participant Agent as DIFY Agent (ai4sec_agent 规则翻译工厂)
-    participant CTI as OPENCTI 平台 (防线指引下发枢纽)
-    participant Ops as 各类情报消费者 (安全运营团队)
+    actor Analyst as 情报分析师
+    actor Consumer as 情报消费者(安全运营团队)
+    participant Design as 设计阶段输出
+    participant Agent as DIFY Agent(ai4sec_agent)
+    participant OpenCTIMCP as ai4sec_opencti_mcp
+    participant CTI as OPENCTI Platform
+    participant Notify as Notification MCP
 
-    Design->>Agent: 系统设计期威胁定性完毕，触发监控转化机制
-    
-    Agent->>CTI: (ai4sec_opencti_mcp) 匹配相关的历史防控逻辑库
-    Note right of Agent: 提取 STIX (输入):<br/>Attack-Pattern (设计指出的高虚警风险)<br/>Course-of-Action (已有审计规则样板)
-    
-    CTI-->>Agent: 下发通用监控准则与关联黑库模型
+    Analyst->>Agent: 配置规则翻译模板与部署范围
+    Note right of Analyst: 输入模板:\nAttack-Pattern{name, x_mitre_id}\nCourse-of-Action{name, playbook_id}
 
-    Agent->>Agent: Agent 通过大模型翻译业务抽象缺陷为底层 Sigma/SPL等可执行脚本
-    
-    Agent->>CTI: 回写新产生的内部专属防御监控特征基线
-    Note left of CTI: 生成 STIX (输出):<br/>Indicator (附带业务环境签名的安全监控模式)<br/>Relationship (Indicator indicates Attack-Pattern)
-    
-    Agent-->>Ops: 联动底层监控工具使新部署 Indicator 生效(或经MCP发布)
-    Note right of Ops: 运营者消费基于该定制 Indicator 发火的预警，过滤通用噪音
+    Design->>Agent: 提交设计阶段产出的威胁模型
+    Note right of Design: 输入事实:\nAttack-Pattern{name="BOLA", kill_chain_phases}\nSoftware{name="user-profile-service", version="1.0.0"}\nSecurity-Goal{name="data-isolation", priority="high"}
+
+    Agent->>OpenCTIMCP: 查询历史规则样板、资产上下文和运行环境
+    OpenCTIMCP->>CTI: 检索 Indicator、Infrastructure、Relationship
+    CTI-->>OpenCTIMCP: 返回现有检测知识与绑定资产
+    Note left of CTI: 返回对象:\nIndicator{name, pattern, pattern_type}\nInfrastructure{name, environment}\nRelationship{relationship_type="indicates"}
+    OpenCTIMCP-->>Agent: 返回可复用监控上下文
+
+    Agent->>Agent: 翻译攻击模式为环境感知检测规则
+    Note right of Agent: 推理输出:\nIndicator{name, pattern, valid_from}\nNote{abstract, content}\nRelationship{relationship_type="indicates"}
+
+    Agent->>OpenCTIMCP: 写回新检测规则与业务上下文
+    OpenCTIMCP->>CTI: 持久化 Indicator 和关系对象
+    Note left of CTI: 输出对象:\nIndicator{name, pattern_type="sigma"}\nRelationship{source_ref, target_ref, relationship_type="indicates"}\nNote{content, object_refs}
+
+    Agent->>Notify: 通知安全运营团队启用规则
+    Notify-->>Consumer: 下发上线通知与命中解释
+    Consumer->>CTI: 查看规则来源、命中目标与设计语义
 ```
 
-## 数据流 (Data Flow)
-```
-sdo:Attack-Pattern (Predictive)
-       + 
-sdo:Software (Component Metadata)
-       ↓
-[Detection Rule Generator]
-       ↓
-sdo:Indicator (Internal-Rule)
-       ↓
-[Situational Awareness]
-```
+## 3、故事：设计阶段识别的 BOLA 风险被转化为运行期高保真监控
+
+### 第一幕：设计阶段输出威胁模型
+
+在新服务上线前，情报分析师完成设计审查，识别出 `Attack-Pattern{name="BOLA"}` 针对 `Software{name="user-profile-service", version="1.0.0"}` 的潜在风险，并把安全目标 `Security-Goal{name="data-isolation", priority="high"}` 一并交给 DIFY Agent，要求系统把这类设计风险转换成运行期可用的规则。
+
+### 第二幕：DIFY Agent 基于 OPENCTI 翻译检测规则
+
+Agent 通过 `ai4sec_opencti_mcp` 查询 OPENCTI 中与该服务相关的历史 `Indicator`、环境 `Infrastructure` 和既有 `Relationship`，确认服务运行在对外暴露的生产环境中。随后 Agent 生成新的 `Indicator{pattern_type="sigma"}`，其规则内容明确描述“当请求参数中的用户 ID 与 JWT 身份不一致时触发告警”，并把规则与 `Attack-Pattern(BOLA)` 建立 `Relationship{relationship_type="indicates"}`。
+
+### 第三幕：安全运营团队消费规则并将命中反馈回图谱
+
+新规则被写入 OPENCTI 后，Notification MCP 向安全运营团队发送上线通知。运营团队不仅知道“这条规则会报警”，还知道“它对应哪一个设计威胁、保护哪一个业务目标、命中后应执行什么动作”。后续真实命中时，事件结果还可以继续回写 OPENCTI，推动监控与威胁模型持续校准。
