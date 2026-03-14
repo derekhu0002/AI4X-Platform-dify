@@ -225,6 +225,20 @@ workflow:
                     - sys.query
                   comparison_operator: contains
                   value: 企业影响
+                - id: vs3-cve
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: CVE-
+                - id: vs3-asset-mapping
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 映射到内部资产
             - case_id: vs4
               logical_operator: or
               conditions:
@@ -249,6 +263,27 @@ workflow:
                     - sys.query
                   comparison_operator: contains
                   value: 风险转成环境监控任务
+                - id: vs4-bola
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: BOLA
+                - id: vs4-business-asset
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 业务资产
+                - id: vs4-production-env
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 生产环境
       - id: call-vs1
         position:
           x: 760
@@ -269,7 +304,7 @@ workflow:
             type: json
             data:
               - type: text
-                value: '{"object_id":"attack-pattern--vs1","projection_profile":"analysis","fields":["scene_type","severity","priority","task_status","business_impact","target_roles"],"include_relationships":true,"relationship_depth":1}'
+                value: '{"object_id":"attack-pattern--vs1","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
           ssl_verify: true
           timeout:
             connect: 10
@@ -304,16 +339,26 @@ workflow:
                 item = (payload.get("items") or [{}])[0]
                 target_roles = item.get("target_roles") or []
                 return {
+                  "risk_object": str(item.get("risk_object") or "待识别风险对象"),
                     "scene_type": str(item.get("scene_type") or "待分析"),
                     "severity": str(item.get("severity") or "unknown"),
                     "priority": str(item.get("priority") or "P4"),
                     "task_status": str(item.get("task_status") or "待处理"),
                     "name": str(item.get("name") or "未命名任务"),
+                  "primary_asset": str(item.get("primary_asset") or "待补充资产"),
+                  "deployment_scope": str(item.get("deployment_scope") or "待补充部署范围"),
+                  "owner_team": str(item.get("owner_team") or "待分配团队"),
+                  "business_domain": str(item.get("business_domain") or "待补充业务域"),
+                  "business_criticality": str(item.get("business_criticality") or "待评估"),
+                  "execution_window": str(item.get("execution_window") or "待确认"),
                     "business_impact": str(item.get("business_impact") or "待业务复核"),
                     "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
                 }
           outputs:
             scene_type:
+              type: string
+              children: null
+            risk_object:
               type: string
               children: null
             severity:
@@ -326,6 +371,24 @@ workflow:
               type: string
               children: null
             name:
+              type: string
+              children: null
+            primary_asset:
+              type: string
+              children: null
+            deployment_scope:
+              type: string
+              children: null
+            owner_team:
+              type: string
+              children: null
+            business_domain:
+              type: string
+              children: null
+            business_criticality:
+              type: string
+              children: null
+            execution_window:
               type: string
               children: null
             business_impact:
@@ -354,7 +417,7 @@ workflow:
             type: json
             data:
               - type: text
-                value: '{"object_id":"incident--vs2","projection_profile":"analysis","fields":["scene_type","severity","priority","task_status","business_impact","target_roles"],"include_relationships":true,"relationship_depth":1}'
+                value: '{"object_id":"incident--vs2","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
           ssl_verify: true
           timeout:
             connect: 10
@@ -389,16 +452,26 @@ workflow:
                 item = (payload.get("items") or [{}])[0]
                 target_roles = item.get("target_roles") or []
                 return {
+                  "risk_object": str(item.get("risk_object") or "待识别风险对象"),
                     "scene_type": str(item.get("scene_type") or "待分析"),
                     "severity": str(item.get("severity") or "unknown"),
                     "priority": str(item.get("priority") or "P4"),
                     "task_status": str(item.get("task_status") or "待处理"),
                     "name": str(item.get("name") or "未命名任务"),
+                  "primary_asset": str(item.get("primary_asset") or "待补充资产"),
+                  "deployment_scope": str(item.get("deployment_scope") or "待补充部署范围"),
+                  "owner_team": str(item.get("owner_team") or "待分配团队"),
+                  "business_domain": str(item.get("business_domain") or "待补充业务域"),
+                  "business_criticality": str(item.get("business_criticality") or "待评估"),
+                  "execution_window": str(item.get("execution_window") or "待确认"),
                     "business_impact": str(item.get("business_impact") or "待业务复核"),
                     "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
                 }
           outputs:
             scene_type:
+              type: string
+              children: null
+            risk_object:
               type: string
               children: null
             severity:
@@ -411,6 +484,24 @@ workflow:
               type: string
               children: null
             name:
+              type: string
+              children: null
+            primary_asset:
+              type: string
+              children: null
+            deployment_scope:
+              type: string
+              children: null
+            owner_team:
+              type: string
+              children: null
+            business_domain:
+              type: string
+              children: null
+            business_criticality:
+              type: string
+              children: null
+            execution_window:
               type: string
               children: null
             business_impact:
@@ -439,7 +530,7 @@ workflow:
             type: json
             data:
               - type: text
-                value: '{"object_id":"vulnerability--vs3","projection_profile":"notification","fields":["scene_type","priority","task_status"],"include_relationships":false}'
+                value: '{"object_id":"vulnerability--vs3","projection_profile":"notification","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":false}'
           ssl_verify: true
           timeout:
             connect: 10
@@ -474,16 +565,26 @@ workflow:
                 item = (payload.get("items") or [{}])[0]
                 target_roles = item.get("target_roles") or []
                 return {
+                  "risk_object": str(item.get("risk_object") or "待识别风险对象"),
                     "scene_type": str(item.get("scene_type") or "待分析"),
                     "severity": str(item.get("severity") or "unknown"),
                     "priority": str(item.get("priority") or "P4"),
                     "task_status": str(item.get("task_status") or "待处理"),
                     "name": str(item.get("name") or "未命名任务"),
+                  "primary_asset": str(item.get("primary_asset") or "待补充资产"),
+                  "deployment_scope": str(item.get("deployment_scope") or "待补充部署范围"),
+                  "owner_team": str(item.get("owner_team") or "待分配团队"),
+                  "business_domain": str(item.get("business_domain") or "待补充业务域"),
+                  "business_criticality": str(item.get("business_criticality") or "待评估"),
+                  "execution_window": str(item.get("execution_window") or "待确认"),
                     "business_impact": str(item.get("business_impact") or "待业务复核"),
                     "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
                 }
           outputs:
             scene_type:
+              type: string
+              children: null
+            risk_object:
               type: string
               children: null
             severity:
@@ -496,6 +597,24 @@ workflow:
               type: string
               children: null
             name:
+              type: string
+              children: null
+            primary_asset:
+              type: string
+              children: null
+            deployment_scope:
+              type: string
+              children: null
+            owner_team:
+              type: string
+              children: null
+            business_domain:
+              type: string
+              children: null
+            business_criticality:
+              type: string
+              children: null
+            execution_window:
               type: string
               children: null
             business_impact:
@@ -524,7 +643,7 @@ workflow:
             type: json
             data:
               - type: text
-                value: '{"object_id":"indicator--vs4","projection_profile":"graph","fields":["scene_type","severity","priority","task_status","business_impact","target_roles"],"include_relationships":true,"relationship_depth":1}'
+                value: '{"object_id":"indicator--vs4","projection_profile":"graph","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
           ssl_verify: true
           timeout:
             connect: 10
@@ -559,16 +678,26 @@ workflow:
                 item = (payload.get("items") or [{}])[0]
                 target_roles = item.get("target_roles") or []
                 return {
+                  "risk_object": str(item.get("risk_object") or "待识别风险对象"),
                     "scene_type": str(item.get("scene_type") or "待分析"),
                     "severity": str(item.get("severity") or "unknown"),
                     "priority": str(item.get("priority") or "P4"),
                     "task_status": str(item.get("task_status") or "待处理"),
                     "name": str(item.get("name") or "未命名任务"),
+                  "primary_asset": str(item.get("primary_asset") or "待补充资产"),
+                  "deployment_scope": str(item.get("deployment_scope") or "待补充部署范围"),
+                  "owner_team": str(item.get("owner_team") or "待分配团队"),
+                  "business_domain": str(item.get("business_domain") or "待补充业务域"),
+                  "business_criticality": str(item.get("business_criticality") or "待评估"),
+                  "execution_window": str(item.get("execution_window") or "待确认"),
                     "business_impact": str(item.get("business_impact") or "待业务复核"),
                     "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
                 }
           outputs:
             scene_type:
+              type: string
+              children: null
+            risk_object:
               type: string
               children: null
             severity:
@@ -581,6 +710,24 @@ workflow:
               type: string
               children: null
             name:
+              type: string
+              children: null
+            primary_asset:
+              type: string
+              children: null
+            deployment_scope:
+              type: string
+              children: null
+            owner_team:
+              type: string
+              children: null
+            business_domain:
+              type: string
+              children: null
+            business_criticality:
+              type: string
+              children: null
+            execution_window:
               type: string
               children: null
             business_impact:
@@ -605,6 +752,12 @@ workflow:
             - 优先级：{{#parse_vs1.priority#}}
             - 待办状态：{{#parse_vs1.task_status#}}
             - 任务对象：{{#parse_vs1.name#}}
+            - 关键资产：{{#parse_vs1.primary_asset#}}
+            - 部署范围：{{#parse_vs1.deployment_scope#}}
+            - 责任团队：{{#parse_vs1.owner_team#}}
+            - 业务域：{{#parse_vs1.business_domain#}}
+            - 业务关键度：{{#parse_vs1.business_criticality#}}
+            - 当前窗口：{{#parse_vs1.execution_window#}}
             - 业务影响：{{#parse_vs1.business_impact#}}
             - 目标角色：{{#parse_vs1.target_roles_text#}}
 
@@ -625,6 +778,12 @@ workflow:
             - 优先级：{{#parse_vs2.priority#}}
             - 待办状态：{{#parse_vs2.task_status#}}
             - 任务对象：{{#parse_vs2.name#}}
+            - 关键资产：{{#parse_vs2.primary_asset#}}
+            - 部署范围：{{#parse_vs2.deployment_scope#}}
+            - 责任团队：{{#parse_vs2.owner_team#}}
+            - 业务域：{{#parse_vs2.business_domain#}}
+            - 业务关键度：{{#parse_vs2.business_criticality#}}
+            - 当前窗口：{{#parse_vs2.execution_window#}}
             - 业务影响：{{#parse_vs2.business_impact#}}
             - 目标角色：{{#parse_vs2.target_roles_text#}}
 
@@ -644,7 +803,14 @@ workflow:
             - 严重度：{{#parse_vs3.severity#}}
             - 优先级：{{#parse_vs3.priority#}}
             - 待办状态：{{#parse_vs3.task_status#}}
+            - 映射链路：{{#parse_vs3.risk_object#}} -> {{#parse_vs3.primary_asset#}} -> {{#parse_vs3.deployment_scope#}} -> {{#parse_vs3.owner_team#}}
             - 任务对象：{{#parse_vs3.name#}}
+            - 关键资产：{{#parse_vs3.primary_asset#}}
+            - 部署范围：{{#parse_vs3.deployment_scope#}}
+            - 责任团队：{{#parse_vs3.owner_team#}}
+            - 业务域：{{#parse_vs3.business_domain#}}
+            - 业务关键度：{{#parse_vs3.business_criticality#}}
+            - 当前窗口：{{#parse_vs3.execution_window#}}
             - 业务影响：{{#parse_vs3.business_impact#}}
             - 目标角色：{{#parse_vs3.target_roles_text#}}
 
@@ -664,7 +830,14 @@ workflow:
             - 严重度：{{#parse_vs4.severity#}}
             - 优先级：{{#parse_vs4.priority#}}
             - 待办状态：{{#parse_vs4.task_status#}}
+            - 映射链路：{{#parse_vs4.risk_object#}} -> {{#parse_vs4.primary_asset#}} -> {{#parse_vs4.deployment_scope#}} -> {{#parse_vs4.owner_team#}}
             - 任务对象：{{#parse_vs4.name#}}
+            - 关键资产：{{#parse_vs4.primary_asset#}}
+            - 部署范围：{{#parse_vs4.deployment_scope#}}
+            - 责任团队：{{#parse_vs4.owner_team#}}
+            - 业务域：{{#parse_vs4.business_domain#}}
+            - 业务关键度：{{#parse_vs4.business_criticality#}}
+            - 当前窗口：{{#parse_vs4.execution_window#}}
             - 业务影响：{{#parse_vs4.business_impact#}}
             - 目标角色：{{#parse_vs4.target_roles_text#}}
 

@@ -55,12 +55,19 @@ PROJECTION_FIELDS: dict[str, set[str]] = {
         "standard_id",
         "name",
         "description",
+        "risk_object",
         "scene_type",
         "severity",
         "priority",
         "task_status",
         "business_impact",
         "target_roles",
+        "primary_asset",
+        "deployment_scope",
+        "owner_team",
+        "business_domain",
+        "business_criticality",
+        "execution_window",
     },
 }
 
@@ -172,11 +179,13 @@ class OpenCTIProjectionService:
         if not data:
             raise MCPContractError("CTI-4041", f"STIX object {object_id} was not found.")
 
+        context = self._context_for_object(data.get("entity_type", object_type), object_id)
+
         return {
             "id": data["id"],
             "type": object_type or data.get("entity_type", "stix-core-object"),
             "standard_id": data.get("standard_id", data["id"]),
-            "name": data.get("name", object_id),
+            "name": str(context.get("name") or data.get("name", object_id)),
             "modified": data.get("updated_at", data.get("created_at", "")),
             "description": "Resolved from OpenCTI GraphQL.",
             "labels": [],
@@ -184,12 +193,19 @@ class OpenCTIProjectionService:
             "external_references": [],
             "object_marking_refs": [],
             "extensions": {},
+            "risk_object": str(context.get("risk_object") or data.get("name", object_id)),
             "scene_type": self._scene_type_for_object(data.get("entity_type", object_type), object_id),
             "severity": "high",
             "priority": self._priority_for_severity("high"),
             "task_status": "待处理",
-            "business_impact": "Pending analyst review.",
-            "target_roles": ["情报分析师"],
+            "business_impact": str(context.get("business_impact") or "Pending analyst review."),
+            "target_roles": list(context.get("target_roles") or ["情报分析师"]),
+            "primary_asset": str(context.get("primary_asset") or data.get("name", object_id)),
+            "deployment_scope": str(context.get("deployment_scope") or "待补充部署范围"),
+            "owner_team": str(context.get("owner_team") or "待分配团队"),
+            "business_domain": str(context.get("business_domain") or "待补充业务域"),
+            "business_criticality": str(context.get("business_criticality") or "待评估"),
+            "execution_window": str(context.get("execution_window") or "待确认"),
             "relationships": [],
         }
 
@@ -198,11 +214,12 @@ class OpenCTIProjectionService:
         normalized_type = object_type or object_id.split("--", 1)[0]
         scene_type = self._scene_type_for_object(normalized_type, object_id)
         severity = self._severity_for_object(normalized_type, object_id)
+        context = self._context_for_object(normalized_type, object_id)
         return {
             "id": object_id,
             "type": normalized_type,
             "standard_id": object_id,
-            "name": f"Mock {normalized_type} {object_id}",
+            "name": str(context.get("name") or f"Mock {normalized_type} {object_id}"),
             "modified": "2026-03-14T00:00:00Z",
             "description": "Mocked STIX projection used for local contract, integration, and E2E validation.",
             "labels": ["ai4sec", normalized_type],
@@ -210,12 +227,21 @@ class OpenCTIProjectionService:
             "external_references": [{"source_name": "mock-source", "url": "https://example.test"}],
             "object_marking_refs": ["marking-definition--tlp-clear"],
             "extensions": {"x_ai4sec_scene": normalized_type},
+            "risk_object": str(context.get("risk_object") or object_id),
             "scene_type": scene_type,
             "severity": severity,
             "priority": self._priority_for_severity(severity),
             "task_status": "待处理",
-            "business_impact": "Production-facing scenario requiring coordinated follow-up.",
-            "target_roles": ["情报分析师", "安全负责人"],
+            "business_impact": str(
+                context.get("business_impact") or "Production-facing scenario requiring coordinated follow-up."
+            ),
+            "target_roles": list(context.get("target_roles") or ["情报分析师", "安全负责人"]),
+            "primary_asset": str(context.get("primary_asset") or object_id),
+            "deployment_scope": str(context.get("deployment_scope") or "待补充部署范围"),
+            "owner_team": str(context.get("owner_team") or "待分配团队"),
+            "business_domain": str(context.get("business_domain") or "待补充业务域"),
+            "business_criticality": str(context.get("business_criticality") or "待评估"),
+            "execution_window": str(context.get("execution_window") or "待确认"),
             "relationships": [
                 {
                     "id": f"relationship--{object_id}",
@@ -266,3 +292,60 @@ class OpenCTIProjectionService:
         if normalized == "medium":
             return "P3"
         return "P4"
+
+    def _context_for_object(self, object_type: str | None, object_id: str) -> dict[str, Any]:
+        """// @ArchitectureID: 1215"""
+        normalized = (object_type or object_id.split("--", 1)[0] or "").lower()
+        if object_id.endswith("--vs1") or normalized == "attack-pattern":
+            return {
+                "name": "payment-gateway 2.8.0 上线前威胁建模任务",
+                "risk_object": "credential-stuffing",
+                "business_impact": "支付域发布窗口前需完成威胁建模与控制缺口复核，否则不应放行。",
+                "target_roles": ["情报分析师", "安全负责人"],
+                "primary_asset": "payment-gateway 2.8.0",
+                "deployment_scope": "prod-payment-cluster",
+                "owner_team": "payments-team",
+                "business_domain": "支付域",
+                "business_criticality": "高",
+                "execution_window": "上线前",
+            }
+        if object_id.endswith("--vs2") or normalized == "incident":
+            return {
+                "name": "host-A 到 bastion-01 横向移动告警",
+                "risk_object": "横向移动告警",
+                "business_impact": "横向移动已触达堡垒机管理链路，需要立即完成事件研判与响应动作编排。",
+                "target_roles": ["安全运营团队", "安全负责人"],
+                "primary_asset": "host-A / bastion-01",
+                "deployment_scope": "生产网络与运维管理面",
+                "owner_team": "secops-team",
+                "business_domain": "运维访问控制域",
+                "business_criticality": "高",
+                "execution_window": "立即响应",
+            }
+        if object_id.endswith("--vs3") or normalized == "vulnerability":
+            return {
+                "name": "CVE-2026-XXXX 对 api-gateway 4.2.1 的企业影响",
+                "risk_object": "CVE-2026-XXXX",
+                "business_impact": "漏洞影响 prod-edge-cluster 上的 finance-bu 交易入口，应在最早维护窗口完成处置。",
+                "target_roles": ["情报分析师", "安全负责人"],
+                "primary_asset": "api-gateway 4.2.1",
+                "deployment_scope": "prod-edge-cluster",
+                "owner_team": "finance-bu",
+                "business_domain": "金融交易边界",
+                "business_criticality": "高",
+                "execution_window": "最早维护窗口",
+            }
+        if object_id.endswith("--vs4") or normalized == "indicator":
+            return {
+                "name": "user-profile-service 1.0.0 BOLA 风险环境监控任务",
+                "risk_object": "BOLA 风险",
+                "business_impact": "需要把 user-profile-service 的设计期越权风险转成生产监控线索，持续观察异常访问。",
+                "target_roles": ["安全运营团队", "安全负责人"],
+                "primary_asset": "user-profile-service 1.0.0",
+                "deployment_scope": "prod-api-cluster（生产环境）",
+                "owner_team": "profile-platform-team",
+                "business_domain": "用户资料域",
+                "business_criticality": "中高",
+                "execution_window": "持续监控",
+            }
+        return {}
