@@ -1,0 +1,127 @@
+{
+  "type": "bundle",
+  "id": "bundle--a0fbf379-7ba1-42fe-8a9e-e5a0f5cd4e91",
+  "objects": [
+    {
+      "type": "identity",
+      "spec_version": "2.1",
+      "id": "identity--f981c487-8f3c-424b-a570-fdd14ca36086",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "finance-bu",
+      "identity_class": "organization",
+      "sectors": [
+        "financial-services"
+      ]
+    },
+    {
+      "type": "software",
+      "spec_version": "2.1",
+      "id": "software--c57c3461-1656-438f-8411-58302a286717",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "api-gateway",
+      "version": "4.2.1",
+      "cpe": "cpe:2.3:a:ai4sec:api-gateway:4.2.1:*:*:*:*:*:*:*"
+    },
+    {
+      "type": "infrastructure",
+      "spec_version": "2.1",
+      "id": "infrastructure--09258a66-86f8-4b19-85f1-abf286986561",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "prod-edge-cluster",
+      "infrastructure_types": [
+        "gateway"
+      ],
+      "description": "Internet-facing production edge cluster."
+    },
+    {
+      "type": "vulnerability",
+      "spec_version": "2.1",
+      "id": "vulnerability--3d9a4704-5cf5-4b6f-b328-9ff2a55115f6",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "CVE-2026-XXXX",
+      "description": "Critical remote code execution vulnerability impacting the API gateway component."
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--7f452ece-dbc1-4ca3-a543-916d9032c99d",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "relationship_type": "affects",
+      "source_ref": "vulnerability--3d9a4704-5cf5-4b6f-b328-9ff2a55115f6",
+      "target_ref": "software--c57c3461-1656-438f-8411-58302a286717"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--37cc9309-85d2-41a5-a999-fde5f826453c",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "relationship_type": "hosts",
+      "source_ref": "software--c57c3461-1656-438f-8411-58302a286717",
+      "target_ref": "infrastructure--09258a66-86f8-4b19-85f1-abf286986561"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--4c1b64af-c519-410e-bdce-7558791c4f46",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "relationship_type": "owns",
+      "source_ref": "identity--f981c487-8f3c-424b-a570-fdd14ca36086",
+      "target_ref": "infrastructure--09258a66-86f8-4b19-85f1-abf286986561"
+    },
+    {
+      "type": "note",
+      "spec_version": "2.1",
+      "id": "note--a4f0d63d-96c7-4c9e-bb48-44508f66c794",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "abstract": "Executive summary",
+      "content": "The affected api-gateway fronts finance workloads and should be remediated in the earliest maintenance window.",
+      "object_refs": [
+        "vulnerability--3d9a4704-5cf5-4b6f-b328-9ff2a55115f6",
+        "software--c57c3461-1656-438f-8411-58302a286717",
+        "infrastructure--09258a66-86f8-4b19-85f1-abf286986561"
+      ]
+    },
+    {
+      "type": "opinion",
+      "spec_version": "2.1",
+      "id": "opinion--d69c1c49-dc31-4803-8406-32377030b44b",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "opinion": "strongly-agree",
+      "explanation": "Immediate remediation is justified because the vulnerable gateway is internet-facing and business critical.",
+      "object_refs": [
+        "note--a4f0d63d-96c7-4c9e-bb48-44508f66c794",
+        "vulnerability--3d9a4704-5cf5-4b6f-b328-9ff2a55115f6"
+      ]
+    },
+    {
+      "type": "report",
+      "spec_version": "2.1",
+      "id": "report--7dd29906-4a8c-48f5-9531-358135637f61",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "vs3-zero-day-impact-analysis",
+      "description": "Enterprise impact evidence for CVE-2026-XXXX.",
+      "published": "2026-03-14T12:00:00.000Z",
+      "report_types": [
+        "vulnerability-report"
+      ],
+      "object_refs": [
+        "identity--f981c487-8f3c-424b-a570-fdd14ca36086",
+        "software--c57c3461-1656-438f-8411-58302a286717",
+        "infrastructure--09258a66-86f8-4b19-85f1-abf286986561",
+        "vulnerability--3d9a4704-5cf5-4b6f-b328-9ff2a55115f6",
+        "note--a4f0d63d-96c7-4c9e-bb48-44508f66c794",
+        "opinion--d69c1c49-dc31-4803-8406-32377030b44b"
+      ]
+    }
+  ]
+}

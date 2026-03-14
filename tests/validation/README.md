@@ -18,16 +18,18 @@
 
 ## 3. 执行顺序
 
-1. 阅读 [00-virtual-test-data.md](./00-virtual-test-data.md)，准备 4 组价值流测试数据。
-2. 使用 [00-capability-summary.md](./00-capability-summary.md) 选择本轮要执行的 capability 文档。
-3. 按 capability 文档逐项执行人工验收。
-4. 使用 [00-acceptance-record-template.md](./00-acceptance-record-template.md) 记录现场结果。
-5. 汇总每条 capability 的通过/不通过结论与现网差距。
+1. 阅读 [00-environment-setup.md](./00-environment-setup.md)，完成测试环境搭建。
+2. 阅读 [00-virtual-test-data.md](./00-virtual-test-data.md)，导入 4 组价值流测试数据。
+3. 使用 [00-capability-summary.md](./00-capability-summary.md) 选择本轮要执行的 capability 文档。
+4. 按 capability 文档逐项执行人工验收。
+5. 使用 [00-acceptance-record-template.md](./00-acceptance-record-template.md) 记录现场结果。
+6. 汇总每条 capability 的通过/不通过结论与现网差距。
 
 ## 4. 文档清单
 
 | 文档 | 用途 |
 | --- | --- |
+| `00-environment-setup.md` | 测试环境搭建、平台启动与数据导入指导 |
 | `00-capability-summary.md` | capability 汇总表与文档索引 |
 | `00-virtual-test-data.md` | 四条价值流的虚拟测试数据与 STIX Bundle 说明 |
 | `00-acceptance-record-template.md` | 人工验收记录模板 |
@@ -42,7 +44,14 @@
 | `09-角色责任治理.md` | capability 测试用例 |
 | `10-业务绩效度量.md` | capability 测试用例 |
 
-## 5. 统一判定规则
+## 5. 测试数据文件
+
+- `tests/validation/test-data/vs1-payment-threat-model-bundle.json`
+- `tests/validation/test-data/vs2-lateral-movement-bundle.json`
+- `tests/validation/test-data/vs3-zero-day-impact-bundle.json`
+- `tests/validation/test-data/vs4-bola-monitoring-bundle.json`
+
+## 6. 统一判定规则
 
 - 通过：步骤可在既有系统入口内完成，结果满足 capability 目标且证据可在 Dify 或 OpenCTI 中核验。
 - 不通过：关键步骤无法执行，或者关键结果缺失、错误、不可追溯。

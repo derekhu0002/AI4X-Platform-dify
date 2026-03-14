@@ -1,0 +1,106 @@
+{
+  "type": "bundle",
+  "id": "bundle--b2865eb1-26d2-421e-9b34-5de2042f49a1",
+  "objects": [
+    {
+      "type": "software",
+      "spec_version": "2.1",
+      "id": "software--4e4bf95d-1e31-44a7-8af5-f43c49b5527c",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "user-profile-service",
+      "version": "1.0.0",
+      "vendor": "AI4SEC Demo"
+    },
+    {
+      "type": "infrastructure",
+      "spec_version": "2.1",
+      "id": "infrastructure--64860cf7-f483-4a37-b4bb-bd219ec509b8",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "prod-api-cluster",
+      "infrastructure_types": [
+        "api-gateway"
+      ],
+      "description": "Production API cluster serving user-profile-service."
+    },
+    {
+      "type": "attack-pattern",
+      "spec_version": "2.1",
+      "id": "attack-pattern--2b76dbf0-766f-45b2-b8f3-29d2bd2c6abd",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "BOLA",
+      "description": "Broken object level authorization risk on user profile access endpoints."
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--8f69cfe9-8088-411c-bb09-9a33cf0d73d8",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "bola-jwt-mismatch",
+      "description": "Detect requests to user profile resources where the requested user identifier does not match the authenticated subject.",
+      "indicator_types": [
+        "malicious-activity"
+      ],
+      "pattern": "[url:value MATCHES '^https://app.example.local/api/users/.+$']",
+      "pattern_type": "stix",
+      "valid_from": "2026-03-14T10:00:00.000Z"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--cc1cc34c-a6c7-4fe3-bdad-e0a85575f1ff",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--8f69cfe9-8088-411c-bb09-9a33cf0d73d8",
+      "target_ref": "attack-pattern--2b76dbf0-766f-45b2-b8f3-29d2bd2c6abd"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--425496f7-b555-4e08-91dc-f5b37e9517dd",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "relationship_type": "hosts",
+      "source_ref": "software--4e4bf95d-1e31-44a7-8af5-f43c49b5527c",
+      "target_ref": "infrastructure--64860cf7-f483-4a37-b4bb-bd219ec509b8"
+    },
+    {
+      "type": "note",
+      "spec_version": "2.1",
+      "id": "note--ea6a1ca7-b0c9-4949-a221-133d2b634e77",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "abstract": "Rule rationale",
+      "content": "This rule translates a design-time BOLA finding into a runtime detection clue for user-profile-service in production.",
+      "object_refs": [
+        "attack-pattern--2b76dbf0-766f-45b2-b8f3-29d2bd2c6abd",
+        "indicator--8f69cfe9-8088-411c-bb09-9a33cf0d73d8",
+        "software--4e4bf95d-1e31-44a7-8af5-f43c49b5527c"
+      ]
+    },
+    {
+      "type": "report",
+      "spec_version": "2.1",
+      "id": "report--cdd45eb6-f1cd-4f17-82b3-ac4bc03fcd58",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "vs4-bola-monitoring-rule",
+      "description": "Design-risk-to-monitoring evidence for the BOLA scenario.",
+      "published": "2026-03-14T12:00:00.000Z",
+      "report_types": [
+        "threat-report"
+      ],
+      "object_refs": [
+        "software--4e4bf95d-1e31-44a7-8af5-f43c49b5527c",
+        "infrastructure--64860cf7-f483-4a37-b4bb-bd219ec509b8",
+        "attack-pattern--2b76dbf0-766f-45b2-b8f3-29d2bd2c6abd",
+        "indicator--8f69cfe9-8088-411c-bb09-9a33cf0d73d8",
+        "note--ea6a1ca7-b0c9-4949-a221-133d2b634e77"
+      ]
+    }
+  ]
+}

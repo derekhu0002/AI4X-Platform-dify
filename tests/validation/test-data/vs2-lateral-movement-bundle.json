@@ -1,0 +1,156 @@
+{
+  "type": "bundle",
+  "id": "bundle--9eb631a4-4309-4f51-b4cd-1f717b35c0fa",
+  "objects": [
+    {
+      "type": "ipv4-addr",
+      "spec_version": "2.1",
+      "id": "ipv4-addr--3f3f2bb7-6019-5344-9d1b-ae6ea0f5f5d9",
+      "value": "10.1.2.7"
+    },
+    {
+      "type": "ipv4-addr",
+      "spec_version": "2.1",
+      "id": "ipv4-addr--9c421b49-ff6f-5df1-8ef4-f2e028f08f72",
+      "value": "10.10.0.15"
+    },
+    {
+      "type": "network-traffic",
+      "spec_version": "2.1",
+      "id": "network-traffic--88f3313f-ab70-5f4b-8c5f-7c9532e057cf",
+      "start": "2026-03-14T11:40:00.000Z",
+      "end": "2026-03-14T11:43:00.000Z",
+      "is_active": false,
+      "src_ref": "ipv4-addr--3f3f2bb7-6019-5344-9d1b-ae6ea0f5f5d9",
+      "dst_ref": "ipv4-addr--9c421b49-ff6f-5df1-8ef4-f2e028f08f72",
+      "protocols": [
+        "smb"
+      ]
+    },
+    {
+      "type": "observed-data",
+      "spec_version": "2.1",
+      "id": "observed-data--019bdbf1-b818-445a-93ac-7a7c8ce5f31a",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "first_observed": "2026-03-14T11:40:00.000Z",
+      "last_observed": "2026-03-14T11:43:00.000Z",
+      "number_observed": 17,
+      "object_refs": [
+        "network-traffic--88f3313f-ab70-5f4b-8c5f-7c9532e057cf"
+      ]
+    },
+    {
+      "type": "indicator",
+      "spec_version": "2.1",
+      "id": "indicator--529f0fca-61ad-4235-917e-c1ef635bf4ed",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "lateral-movement-host-a",
+      "description": "IOC for anomalous lateral movement from host-A.",
+      "indicator_types": [
+        "anomalous-activity"
+      ],
+      "pattern": "[ipv4-addr:value = '10.1.2.7']",
+      "pattern_type": "stix",
+      "valid_from": "2026-03-14T11:40:00.000Z"
+    },
+    {
+      "type": "attack-pattern",
+      "spec_version": "2.1",
+      "id": "attack-pattern--8e3a72f1-9321-4b4e-8cbf-62adf19b78bf",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "lateral-movement",
+      "description": "Suspicious SMB-based lateral movement toward bastion systems."
+    },
+    {
+      "type": "course-of-action",
+      "spec_version": "2.1",
+      "id": "course-of-action--35d8df1b-a475-419d-a2c2-c5dc65861b12",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "isolate-host-a",
+      "description": "Isolate host-A, block SMB path to bastion-01, and collect volatile evidence."
+    },
+    {
+      "type": "grouping",
+      "spec_version": "2.1",
+      "id": "grouping--7dc80ee0-3976-4b49-9ba8-f10e44f57ef5",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "possible-lateral-movement-case",
+      "context": "suspicious-activity",
+      "object_refs": [
+        "observed-data--019bdbf1-b818-445a-93ac-7a7c8ce5f31a",
+        "indicator--529f0fca-61ad-4235-917e-c1ef635bf4ed",
+        "attack-pattern--8e3a72f1-9321-4b4e-8cbf-62adf19b78bf",
+        "course-of-action--35d8df1b-a475-419d-a2c2-c5dc65861b12"
+      ]
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--4af391f1-54af-4372-b15d-527fe13d8955",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "relationship_type": "indicates",
+      "source_ref": "indicator--529f0fca-61ad-4235-917e-c1ef635bf4ed",
+      "target_ref": "attack-pattern--8e3a72f1-9321-4b4e-8cbf-62adf19b78bf"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--f6b3972c-2aa4-41b3-b321-578e0af31c6e",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "relationship_type": "related-to",
+      "source_ref": "grouping--7dc80ee0-3976-4b49-9ba8-f10e44f57ef5",
+      "target_ref": "observed-data--019bdbf1-b818-445a-93ac-7a7c8ce5f31a"
+    },
+    {
+      "type": "relationship",
+      "spec_version": "2.1",
+      "id": "relationship--21f2c181-aa2c-4d85-bd5d-5721f5b5b7e0",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "relationship_type": "mitigates",
+      "source_ref": "course-of-action--35d8df1b-a475-419d-a2c2-c5dc65861b12",
+      "target_ref": "attack-pattern--8e3a72f1-9321-4b4e-8cbf-62adf19b78bf"
+    },
+    {
+      "type": "note",
+      "spec_version": "2.1",
+      "id": "note--59e992bf-a08d-46b2-8b12-06f8088420e8",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "abstract": "Response summary",
+      "content": "Host-A should be isolated immediately, volatile memory should be captured, and the IOC should be blocked.",
+      "object_refs": [
+        "grouping--7dc80ee0-3976-4b49-9ba8-f10e44f57ef5",
+        "course-of-action--35d8df1b-a475-419d-a2c2-c5dc65861b12"
+      ]
+    },
+    {
+      "type": "report",
+      "spec_version": "2.1",
+      "id": "report--754f9cfb-55d6-49ad-83e6-d8fe863ff159",
+      "created": "2026-03-14T12:00:00.000Z",
+      "modified": "2026-03-14T12:00:00.000Z",
+      "name": "vs2-lateral-movement-response",
+      "description": "Observed evidence and response guidance for suspicious lateral movement.",
+      "published": "2026-03-14T12:00:00.000Z",
+      "report_types": [
+        "incident-report"
+      ],
+      "object_refs": [
+        "observed-data--019bdbf1-b818-445a-93ac-7a7c8ce5f31a",
+        "indicator--529f0fca-61ad-4235-917e-c1ef635bf4ed",
+        "attack-pattern--8e3a72f1-9321-4b4e-8cbf-62adf19b78bf",
+        "course-of-action--35d8df1b-a475-419d-a2c2-c5dc65861b12",
+        "grouping--7dc80ee0-3976-4b49-9ba8-f10e44f57ef5",
+        "note--59e992bf-a08d-46b2-8b12-06f8088420e8"
+      ]
+    }
+  ]
+}

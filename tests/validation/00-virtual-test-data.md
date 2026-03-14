@@ -9,13 +9,16 @@
 - 所有对象使用 STIX 2.1 语义表达。
 - 每条价值流至少准备 1 个 Bundle 文件。
 - Bundle 文件命名建议采用 `vsX-<scenario>-bundle.json`。
+- 实际数据文件已放置在 `tests/validation/test-data/` 目录下。
 - 导入后需在 OpenCTI 中核验对象、关系和时间线是否可见。
+- 为保持 STIX 2.1 标准，VS2 的“事件工单”测试数据使用 `Grouping` 和 `Report` 作为事件载体；VS4 的设计目标说明使用 `Note` 承载。
 
 ## 3. VS1 威胁建模数据集
 
 | 项 | 内容 |
 | --- | --- |
 | 建议 Bundle 文件 | `vs1-payment-threat-model-bundle.json` |
+| 文件位置 | `tests/validation/test-data/vs1-payment-threat-model-bundle.json` |
 | 场景 | 支付域 `v2.8.0` 上线前威胁建模 |
 | 关键对象 | `Software(payment-gateway)`、`Infrastructure(prod-payment-cluster)`、`Identity(payments-team)`、`Attack-Pattern(credential-stuffing)`、`Vulnerability(CVE-2026-1001)`、`Course-of-Action(enable-step-up-auth)`、`Opinion(strongly-disagree)` |
 | 关键关系 | `Software -> Infrastructure (hosts)`、`Attack-Pattern -> Software (targets)`、`Course-of-Action -> Attack-Pattern (mitigates)` |
@@ -27,9 +30,10 @@
 | 项 | 内容 |
 | --- | --- |
 | 建议 Bundle 文件 | `vs2-lateral-movement-bundle.json` |
+| 文件位置 | `tests/validation/test-data/vs2-lateral-movement-bundle.json` |
 | 场景 | 横向移动告警进入响应闭环 |
-| 关键对象 | `Observed-Data(observed=17)`、`Network-Traffic(host-A -> bastion-01)`、`Indicator(10.1.2.7)`、`Attack-Pattern(lateral-movement)`、`Incident(possible-lateral-movement)`、`Course-of-Action(isolate-host-A)` |
-| 关键关系 | `Indicator -> Attack-Pattern (indicates)`、`Incident -> Observed-Data (related-to)`、`Course-of-Action -> Incident (mitigates)` |
+| 关键对象 | `Observed-Data(observed=17)`、`Network-Traffic(host-A -> bastion-01)`、`Indicator(10.1.2.7)`、`Attack-Pattern(lateral-movement)`、`Grouping(possible-lateral-movement-case)`、`Course-of-Action(isolate-host-A)` |
+| 关键关系 | `Indicator -> Attack-Pattern (indicates)`、`Grouping -> Observed-Data (related-to)`、`Course-of-Action -> Attack-Pattern (mitigates)` |
 | 重点属性样例 | `Network-Traffic.protocols=["smb"]`、`Incident.severity=high`、`Course-of-Action.priority=P1` |
 | 导入后核验点 | 告警证据、事件对象、处置动作与通知摘要可以串成闭环 |
 
@@ -38,6 +42,7 @@
 | 项 | 内容 |
 | --- | --- |
 | 建议 Bundle 文件 | `vs3-zero-day-impact-bundle.json` |
+| 文件位置 | `tests/validation/test-data/vs3-zero-day-impact-bundle.json` |
 | 场景 | 外部零日转化为企业影响结论 |
 | 关键对象 | `Vulnerability(CVE-2026-XXXX)`、`Report(0day-advisory)`、`Software(api-gateway)`、`Infrastructure(prod-edge-cluster)`、`Identity(finance-bu)`、`Opinion(prioritize-immediately)`、`Note(executive-summary)` |
 | 关键关系 | `Vulnerability -> Software (affects)`、`Software -> Infrastructure (hosts)`、`Identity -> Infrastructure (owns)` |
@@ -49,8 +54,9 @@
 | 项 | 内容 |
 | --- | --- |
 | 建议 Bundle 文件 | `vs4-bola-monitoring-bundle.json` |
+| 文件位置 | `tests/validation/test-data/vs4-bola-monitoring-bundle.json` |
 | 场景 | 设计期 BOLA 风险转化为运行期监控规则 |
-| 关键对象 | `Attack-Pattern(BOLA)`、`Software(user-profile-service)`、`Security-Goal(data-isolation)`、`Indicator(bola-jwt-mismatch)`、`Infrastructure(prod-api-cluster)`、`Note(rule-rationale)` |
+| 关键对象 | `Attack-Pattern(BOLA)`、`Software(user-profile-service)`、`Indicator(bola-jwt-mismatch)`、`Infrastructure(prod-api-cluster)`、`Note(rule-rationale)` |
 | 关键关系 | `Indicator -> Attack-Pattern (indicates)`、`Software -> Infrastructure (hosts)`、`Note -> Indicator (related-to)` |
 | 重点属性样例 | `Indicator.pattern_type=sigma`、`Indicator.valid_from=2026-03-14T10:00:00Z` |
 | 导入后核验点 | 规则来源、保护目标和命中解释可追溯到设计风险 |

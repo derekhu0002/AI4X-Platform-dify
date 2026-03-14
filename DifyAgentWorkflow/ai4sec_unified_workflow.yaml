@@ -33,34 +33,56 @@ workflow:
     edges:
       - id: edge-start-router
         source: start-node
+        sourceHandle: source
         target: route-intent
+        targetHandle: target
       - id: edge-router-vs1
         source: route-intent
+        sourceHandle: vs1
         target: call-vs1
+        targetHandle: target
       - id: edge-router-vs2
         source: route-intent
+        sourceHandle: vs2
         target: call-vs2
+        targetHandle: target
       - id: edge-router-vs3
         source: route-intent
+        sourceHandle: vs3
         target: call-vs3
+        targetHandle: target
       - id: edge-router-vs4
         source: route-intent
+        sourceHandle: vs4
         target: call-vs4
+        targetHandle: target
       - id: edge-vs1-answer
         source: call-vs1
+        sourceHandle: source
         target: final-answer
+        targetHandle: target
       - id: edge-vs2-answer
         source: call-vs2
+        sourceHandle: source
         target: final-answer
+        targetHandle: target
       - id: edge-vs3-answer
         source: call-vs3
+        sourceHandle: source
         target: final-answer
+        targetHandle: target
       - id: edge-vs4-answer
         source: call-vs4
+        sourceHandle: source
         target: final-answer
+        targetHandle: target
     nodes:
       - id: start-node
+        position:
+          x: 100
+          y: 120
         data:
+          desc: ''
           title: Unified Entry
           type: start
           variables:
@@ -84,19 +106,27 @@ workflow:
               type: select
               variable: selected_flow
       - id: route-intent
+        position:
+          x: 420
+          y: 120
         data:
+          desc: ''
           title: Route By Menu Or Intent
           type: if-else
-          conditions:
+          cases:
             - case_id: vs1
               logical_operator: or
               conditions:
-                - variable_selector:
+                - id: vs1-selected-flow
+                  varType: string
+                  variable_selector:
                     - start-node
                     - selected_flow
-                  comparison_operator: equals
+                  comparison_operator: '='
                   value: VS1
-                - variable_selector:
+                - id: vs1-user-request
+                  varType: string
+                  variable_selector:
                     - start-node
                     - user_request
                   comparison_operator: contains
@@ -104,12 +134,16 @@ workflow:
             - case_id: vs2
               logical_operator: or
               conditions:
-                - variable_selector:
+                - id: vs2-selected-flow
+                  varType: string
+                  variable_selector:
                     - start-node
                     - selected_flow
-                  comparison_operator: equals
+                  comparison_operator: '='
                   value: VS2
-                - variable_selector:
+                - id: vs2-user-request
+                  varType: string
+                  variable_selector:
                     - start-node
                     - user_request
                   comparison_operator: contains
@@ -117,76 +151,178 @@ workflow:
             - case_id: vs3
               logical_operator: or
               conditions:
-                - variable_selector:
+                - id: vs3-selected-flow
+                  varType: string
+                  variable_selector:
                     - start-node
                     - selected_flow
-                  comparison_operator: equals
+                  comparison_operator: '='
                   value: VS3
-                - variable_selector:
+                - id: vs3-user-request
+                  varType: string
+                  variable_selector:
                     - start-node
                     - user_request
                   comparison_operator: contains
                   value: 漏洞
-            - case_id: default-vs4
+            - case_id: vs4
               logical_operator: or
               conditions:
-                - variable_selector:
+                - id: vs4-selected-flow
+                  varType: string
+                  variable_selector:
                     - start-node
                     - selected_flow
-                  comparison_operator: equals
+                  comparison_operator: '='
                   value: VS4
-                - variable_selector:
+                - id: vs4-user-request
+                  varType: string
+                  variable_selector:
                     - start-node
                     - user_request
                   comparison_operator: contains
                   value: 监控
       - id: call-vs1
+        position:
+          x: 760
+          y: 0
         data:
+          desc: ''
           title: VS1 Threat Modeling
           type: http-request
-          method: POST
+          variables: []
+          method: post
           url: '{{#env.OPENCTI_MCP_URL#}}/query'
+          authorization:
+            type: no-auth
+            config: null
+          headers: ''
+          params: ''
           body:
-            object_id: attack-pattern--vs1
-            projection_profile: analysis
-            include_relationships: true
-            relationship_depth: 1
+            type: json
+            data:
+              - type: text
+                value: '{"object_id":"attack-pattern--vs1","projection_profile":"analysis","include_relationships":true,"relationship_depth":1}'
+          ssl_verify: true
+          timeout:
+            connect: 10
+            read: 600
+            write: 600
+            max_connect_timeout: 10
+            max_read_timeout: 600
+            max_write_timeout: 600
+          retry_config:
+            retry_enabled: true
+            max_retries: 3
+            retry_interval: 100
       - id: call-vs2
+        position:
+          x: 760
+          y: 100
         data:
+          desc: ''
           title: VS2 Incident Response
           type: http-request
-          method: POST
+          variables: []
+          method: post
           url: '{{#env.OPENCTI_MCP_URL#}}/query'
+          authorization:
+            type: no-auth
+            config: null
+          headers: ''
+          params: ''
           body:
-            object_id: incident--vs2
-            projection_profile: analysis
-            include_relationships: true
-            relationship_depth: 1
+            type: json
+            data:
+              - type: text
+                value: '{"object_id":"incident--vs2","projection_profile":"analysis","include_relationships":true,"relationship_depth":1}'
+          ssl_verify: true
+          timeout:
+            connect: 10
+            read: 600
+            write: 600
+            max_connect_timeout: 10
+            max_read_timeout: 600
+            max_write_timeout: 600
+          retry_config:
+            retry_enabled: true
+            max_retries: 3
+            retry_interval: 100
       - id: call-vs3
+        position:
+          x: 760
+          y: 200
         data:
+          desc: ''
           title: VS3 Vulnerability Intelligence
           type: http-request
-          method: POST
+          variables: []
+          method: post
           url: '{{#env.OPENCTI_MCP_URL#}}/query'
+          authorization:
+            type: no-auth
+            config: null
+          headers: ''
+          params: ''
           body:
-            object_id: vulnerability--vs3
-            projection_profile: notification
-            include_relationships: false
+            type: json
+            data:
+              - type: text
+                value: '{"object_id":"vulnerability--vs3","projection_profile":"notification","include_relationships":false}'
+          ssl_verify: true
+          timeout:
+            connect: 10
+            read: 600
+            write: 600
+            max_connect_timeout: 10
+            max_read_timeout: 600
+            max_write_timeout: 600
+          retry_config:
+            retry_enabled: true
+            max_retries: 3
+            retry_interval: 100
       - id: call-vs4
+        position:
+          x: 760
+          y: 300
         data:
+          desc: ''
           title: VS4 Monitoring Rules
           type: http-request
-          method: POST
+          variables: []
+          method: post
           url: '{{#env.OPENCTI_MCP_URL#}}/query'
+          authorization:
+            type: no-auth
+            config: null
+          headers: ''
+          params: ''
           body:
-            object_id: indicator--vs4
-            projection_profile: graph
-            include_relationships: true
-            relationship_depth: 1
+            type: json
+            data:
+              - type: text
+                value: '{"object_id":"indicator--vs4","projection_profile":"graph","include_relationships":true,"relationship_depth":1}'
+          ssl_verify: true
+          timeout:
+            connect: 10
+            read: 600
+            write: 600
+            max_connect_timeout: 10
+            max_read_timeout: 600
+            max_write_timeout: 600
+          retry_config:
+            retry_enabled: true
+            max_retries: 3
+            retry_interval: 100
       - id: final-answer
+        position:
+          x: 1120
+          y: 140
         data:
+          desc: ''
           title: Unified Output
           type: answer
+          variables: []
           answer: |
             已完成统一分流。当前工作流会优先使用入口菜单，其次按自然语言意图识别自动路由。
             对于 OpenCTI webhook 入口，请直接调用 Dify 的 `/webhooks/opencti/threat-intelligence`，当前链路不要求鉴权。
