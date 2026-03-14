@@ -59,20 +59,40 @@ workflow:
       - id: edge-vs1-answer
         source: call-vs1
         sourceHandle: source
+        target: parse_vs1
+        targetHandle: target
+      - id: edge-parse-vs1-answer
+        source: parse_vs1
+        sourceHandle: source
         target: answer-vs1
         targetHandle: target
       - id: edge-vs2-answer
         source: call-vs2
+        sourceHandle: source
+        target: parse_vs2
+        targetHandle: target
+      - id: edge-parse-vs2-answer
+        source: parse_vs2
         sourceHandle: source
         target: answer-vs2
         targetHandle: target
       - id: edge-vs3-answer
         source: call-vs3
         sourceHandle: source
+        target: parse_vs3
+        targetHandle: target
+      - id: edge-parse-vs3-answer
+        source: parse_vs3
+        sourceHandle: source
         target: answer-vs3
         targetHandle: target
       - id: edge-vs4-answer
         source: call-vs4
+        sourceHandle: source
+        target: parse_vs4
+        targetHandle: target
+      - id: edge-parse-vs4-answer
+        source: parse_vs4
         sourceHandle: source
         target: answer-vs4
         targetHandle: target
@@ -215,6 +235,58 @@ workflow:
             retry_enabled: true
             max_retries: 3
             retry_interval: 100
+      - id: parse_vs1
+        position:
+          x: 950
+          y: 0
+        data:
+          desc: ''
+          title: Parse VS1 Response
+          type: code
+          variables:
+            - variable: response_json
+              value_selector:
+                - call-vs1
+                - body
+          code_language: python3
+          code: |
+            import json
+
+            def main(response_json: str) -> dict:
+                payload = json.loads(response_json)
+                item = (payload.get("items") or [{}])[0]
+                target_roles = item.get("target_roles") or []
+                return {
+                    "scene_type": str(item.get("scene_type") or "待分析"),
+                    "severity": str(item.get("severity") or "unknown"),
+                    "priority": str(item.get("priority") or "P4"),
+                    "task_status": str(item.get("task_status") or "待处理"),
+                    "name": str(item.get("name") or "未命名任务"),
+                    "business_impact": str(item.get("business_impact") or "待业务复核"),
+                    "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
+                }
+          outputs:
+            scene_type:
+              type: string
+              children: null
+            severity:
+              type: string
+              children: null
+            priority:
+              type: string
+              children: null
+            task_status:
+              type: string
+              children: null
+            name:
+              type: string
+              children: null
+            business_impact:
+              type: string
+              children: null
+            target_roles_text:
+              type: string
+              children: null
       - id: call-vs2
         position:
           x: 760
@@ -248,6 +320,58 @@ workflow:
             retry_enabled: true
             max_retries: 3
             retry_interval: 100
+      - id: parse_vs2
+        position:
+          x: 950
+          y: 100
+        data:
+          desc: ''
+          title: Parse VS2 Response
+          type: code
+          variables:
+            - variable: response_json
+              value_selector:
+                - call-vs2
+                - body
+          code_language: python3
+          code: |
+            import json
+
+            def main(response_json: str) -> dict:
+                payload = json.loads(response_json)
+                item = (payload.get("items") or [{}])[0]
+                target_roles = item.get("target_roles") or []
+                return {
+                    "scene_type": str(item.get("scene_type") or "待分析"),
+                    "severity": str(item.get("severity") or "unknown"),
+                    "priority": str(item.get("priority") or "P4"),
+                    "task_status": str(item.get("task_status") or "待处理"),
+                    "name": str(item.get("name") or "未命名任务"),
+                    "business_impact": str(item.get("business_impact") or "待业务复核"),
+                    "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
+                }
+          outputs:
+            scene_type:
+              type: string
+              children: null
+            severity:
+              type: string
+              children: null
+            priority:
+              type: string
+              children: null
+            task_status:
+              type: string
+              children: null
+            name:
+              type: string
+              children: null
+            business_impact:
+              type: string
+              children: null
+            target_roles_text:
+              type: string
+              children: null
       - id: call-vs3
         position:
           x: 760
@@ -281,6 +405,58 @@ workflow:
             retry_enabled: true
             max_retries: 3
             retry_interval: 100
+      - id: parse_vs3
+        position:
+          x: 950
+          y: 200
+        data:
+          desc: ''
+          title: Parse VS3 Response
+          type: code
+          variables:
+            - variable: response_json
+              value_selector:
+                - call-vs3
+                - body
+          code_language: python3
+          code: |
+            import json
+
+            def main(response_json: str) -> dict:
+                payload = json.loads(response_json)
+                item = (payload.get("items") or [{}])[0]
+                target_roles = item.get("target_roles") or []
+                return {
+                    "scene_type": str(item.get("scene_type") or "待分析"),
+                    "severity": str(item.get("severity") or "unknown"),
+                    "priority": str(item.get("priority") or "P4"),
+                    "task_status": str(item.get("task_status") or "待处理"),
+                    "name": str(item.get("name") or "未命名任务"),
+                    "business_impact": str(item.get("business_impact") or "待业务复核"),
+                    "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
+                }
+          outputs:
+            scene_type:
+              type: string
+              children: null
+            severity:
+              type: string
+              children: null
+            priority:
+              type: string
+              children: null
+            task_status:
+              type: string
+              children: null
+            name:
+              type: string
+              children: null
+            business_impact:
+              type: string
+              children: null
+            target_roles_text:
+              type: string
+              children: null
       - id: call-vs4
         position:
           x: 760
@@ -314,9 +490,61 @@ workflow:
             retry_enabled: true
             max_retries: 3
             retry_interval: 100
+      - id: parse_vs4
+        position:
+          x: 950
+          y: 300
+        data:
+          desc: ''
+          title: Parse VS4 Response
+          type: code
+          variables:
+            - variable: response_json
+              value_selector:
+                - call-vs4
+                - body
+          code_language: python3
+          code: |
+            import json
+
+            def main(response_json: str) -> dict:
+                payload = json.loads(response_json)
+                item = (payload.get("items") or [{}])[0]
+                target_roles = item.get("target_roles") or []
+                return {
+                    "scene_type": str(item.get("scene_type") or "待分析"),
+                    "severity": str(item.get("severity") or "unknown"),
+                    "priority": str(item.get("priority") or "P4"),
+                    "task_status": str(item.get("task_status") or "待处理"),
+                    "name": str(item.get("name") or "未命名任务"),
+                    "business_impact": str(item.get("business_impact") or "待业务复核"),
+                    "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
+                }
+          outputs:
+            scene_type:
+              type: string
+              children: null
+            severity:
+              type: string
+              children: null
+            priority:
+              type: string
+              children: null
+            task_status:
+              type: string
+              children: null
+            name:
+              type: string
+              children: null
+            business_impact:
+              type: string
+              children: null
+            target_roles_text:
+              type: string
+              children: null
       - id: answer-vs1
         position:
-          x: 1120
+          x: 1200
           y: 20
         data:
           desc: ''
@@ -325,18 +553,18 @@ workflow:
           variables: []
           answer: |
             已受理任务，首屏分流信息如下：
-            - 场景类型：{{call-vs1.body.items[0].scene_type}}
-            - 严重度：{{call-vs1.body.items[0].severity}}
-            - 优先级：{{call-vs1.body.items[0].priority}}
-            - 待办状态：{{call-vs1.body.items[0].task_status}}
-            - 任务对象：{{call-vs1.body.items[0].name}}
-            - 业务影响：{{call-vs1.body.items[0].business_impact}}
-            - 目标角色：{{call-vs1.body.items[0].target_roles}}
+            - 场景类型：{{#parse_vs1.scene_type#}}
+            - 严重度：{{#parse_vs1.severity#}}
+            - 优先级：{{#parse_vs1.priority#}}
+            - 待办状态：{{#parse_vs1.task_status#}}
+            - 任务对象：{{#parse_vs1.name#}}
+            - 业务影响：{{#parse_vs1.business_impact#}}
+            - 目标角色：{{#parse_vs1.target_roles_text#}}
 
             可继续进入发布判定、控制缺口复核和证据核验。
       - id: answer-vs2
         position:
-          x: 1120
+          x: 1200
           y: 100
         data:
           desc: ''
@@ -345,18 +573,18 @@ workflow:
           variables: []
           answer: |
             已受理任务，首屏分流信息如下：
-            - 场景类型：{{call-vs2.body.items[0].scene_type}}
-            - 严重度：{{call-vs2.body.items[0].severity}}
-            - 优先级：{{call-vs2.body.items[0].priority}}
-            - 待办状态：{{call-vs2.body.items[0].task_status}}
-            - 任务对象：{{call-vs2.body.items[0].name}}
-            - 业务影响：{{call-vs2.body.items[0].business_impact}}
-            - 目标角色：{{call-vs2.body.items[0].target_roles}}
+            - 场景类型：{{#parse_vs2.scene_type#}}
+            - 严重度：{{#parse_vs2.severity#}}
+            - 优先级：{{#parse_vs2.priority#}}
+            - 待办状态：{{#parse_vs2.task_status#}}
+            - 任务对象：{{#parse_vs2.name#}}
+            - 业务影响：{{#parse_vs2.business_impact#}}
+            - 目标角色：{{#parse_vs2.target_roles_text#}}
 
             可继续进入事件分级、响应动作编排和证据核验。
       - id: answer-vs3
         position:
-          x: 1120
+          x: 1200
           y: 180
         data:
           desc: ''
@@ -365,18 +593,18 @@ workflow:
           variables: []
           answer: |
             已受理任务，首屏分流信息如下：
-            - 场景类型：{{call-vs3.body.items[0].scene_type}}
-            - 严重度：{{call-vs3.body.items[0].severity}}
-            - 优先级：{{call-vs3.body.items[0].priority}}
-            - 待办状态：{{call-vs3.body.items[0].task_status}}
-            - 任务对象：{{call-vs3.body.items[0].name}}
-            - 业务影响：{{call-vs3.body.items[0].business_impact}}
-            - 目标角色：{{call-vs3.body.items[0].target_roles}}
+            - 场景类型：{{#parse_vs3.scene_type#}}
+            - 严重度：{{#parse_vs3.severity#}}
+            - 优先级：{{#parse_vs3.priority#}}
+            - 待办状态：{{#parse_vs3.task_status#}}
+            - 任务对象：{{#parse_vs3.name#}}
+            - 业务影响：{{#parse_vs3.business_impact#}}
+            - 目标角色：{{#parse_vs3.target_roles_text#}}
 
             可继续进入影响范围确认、窗口期建议和决策摘要生成。
       - id: answer-vs4
         position:
-          x: 1120
+          x: 1200
           y: 260
         data:
           desc: ''
@@ -385,13 +613,13 @@ workflow:
           variables: []
           answer: |
             已受理任务，首屏分流信息如下：
-            - 场景类型：{{call-vs4.body.items[0].scene_type}}
-            - 严重度：{{call-vs4.body.items[0].severity}}
-            - 优先级：{{call-vs4.body.items[0].priority}}
-            - 待办状态：{{call-vs4.body.items[0].task_status}}
-            - 任务对象：{{call-vs4.body.items[0].name}}
-            - 业务影响：{{call-vs4.body.items[0].business_impact}}
-            - 目标角色：{{call-vs4.body.items[0].target_roles}}
+            - 场景类型：{{#parse_vs4.scene_type#}}
+            - 严重度：{{#parse_vs4.severity#}}
+            - 优先级：{{#parse_vs4.priority#}}
+            - 待办状态：{{#parse_vs4.task_status#}}
+            - 任务对象：{{#parse_vs4.name#}}
+            - 业务影响：{{#parse_vs4.business_impact#}}
+            - 目标角色：{{#parse_vs4.target_roles_text#}}
 
             可继续进入规则草案确认、上线动作和命中反馈校准。
 metadata:
