@@ -18,6 +18,10 @@ def test_query_contract_returns_notification_projection() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["source"] == "mock"
+    assert payload["items"][0]["scene_type"] == "漏洞影响"
+    assert payload["items"][0]["severity"] == "critical"
+    assert payload["items"][0]["priority"] == "P1"
+    assert payload["items"][0]["task_status"] == "待处理"
     assert payload["items"][0]["business_impact"]
 
 

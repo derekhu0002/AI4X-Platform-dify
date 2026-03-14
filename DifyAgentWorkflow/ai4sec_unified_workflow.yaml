@@ -59,22 +59,22 @@ workflow:
       - id: edge-vs1-answer
         source: call-vs1
         sourceHandle: source
-        target: final-answer
+        target: answer-vs1
         targetHandle: target
       - id: edge-vs2-answer
         source: call-vs2
         sourceHandle: source
-        target: final-answer
+        target: answer-vs2
         targetHandle: target
       - id: edge-vs3-answer
         source: call-vs3
         sourceHandle: source
-        target: final-answer
+        target: answer-vs3
         targetHandle: target
       - id: edge-vs4-answer
         source: call-vs4
         sourceHandle: source
-        target: final-answer
+        target: answer-vs4
         targetHandle: target
     nodes:
       - id: start-node
@@ -202,7 +202,7 @@ workflow:
             type: json
             data:
               - type: text
-                value: '{"object_id":"attack-pattern--vs1","projection_profile":"analysis","include_relationships":true,"relationship_depth":1}'
+                value: '{"object_id":"attack-pattern--vs1","projection_profile":"analysis","fields":["scene_type","severity","priority","task_status","business_impact","target_roles"],"include_relationships":true,"relationship_depth":1}'
           ssl_verify: true
           timeout:
             connect: 10
@@ -235,7 +235,7 @@ workflow:
             type: json
             data:
               - type: text
-                value: '{"object_id":"incident--vs2","projection_profile":"analysis","include_relationships":true,"relationship_depth":1}'
+                value: '{"object_id":"incident--vs2","projection_profile":"analysis","fields":["scene_type","severity","priority","task_status","business_impact","target_roles"],"include_relationships":true,"relationship_depth":1}'
           ssl_verify: true
           timeout:
             connect: 10
@@ -268,7 +268,7 @@ workflow:
             type: json
             data:
               - type: text
-                value: '{"object_id":"vulnerability--vs3","projection_profile":"notification","include_relationships":false}'
+                value: '{"object_id":"vulnerability--vs3","projection_profile":"notification","fields":["scene_type","priority","task_status"],"include_relationships":false}'
           ssl_verify: true
           timeout:
             connect: 10
@@ -301,7 +301,7 @@ workflow:
             type: json
             data:
               - type: text
-                value: '{"object_id":"indicator--vs4","projection_profile":"graph","include_relationships":true,"relationship_depth":1}'
+                value: '{"object_id":"indicator--vs4","projection_profile":"graph","fields":["scene_type","severity","priority","task_status","business_impact","target_roles"],"include_relationships":true,"relationship_depth":1}'
           ssl_verify: true
           timeout:
             connect: 10
@@ -314,18 +314,86 @@ workflow:
             retry_enabled: true
             max_retries: 3
             retry_interval: 100
-      - id: final-answer
+      - id: answer-vs1
         position:
           x: 1120
-          y: 140
+          y: 20
         data:
           desc: ''
-          title: Unified Output
+          title: VS1 Output
           type: answer
           variables: []
           answer: |
-            已完成统一分流。当前工作流会优先使用入口菜单，其次按自然语言意图识别自动路由。
-            对于 OpenCTI webhook 入口，请直接调用 Dify 的 `/webhooks/opencti/threat-intelligence`，当前链路不要求鉴权。
+            已受理任务，首屏分流信息如下：
+            - 场景类型：{{call-vs1.body.items[0].scene_type}}
+            - 严重度：{{call-vs1.body.items[0].severity}}
+            - 优先级：{{call-vs1.body.items[0].priority}}
+            - 待办状态：{{call-vs1.body.items[0].task_status}}
+            - 任务对象：{{call-vs1.body.items[0].name}}
+            - 业务影响：{{call-vs1.body.items[0].business_impact}}
+            - 目标角色：{{call-vs1.body.items[0].target_roles}}
+
+            可继续进入发布判定、控制缺口复核和证据核验。
+      - id: answer-vs2
+        position:
+          x: 1120
+          y: 100
+        data:
+          desc: ''
+          title: VS2 Output
+          type: answer
+          variables: []
+          answer: |
+            已受理任务，首屏分流信息如下：
+            - 场景类型：{{call-vs2.body.items[0].scene_type}}
+            - 严重度：{{call-vs2.body.items[0].severity}}
+            - 优先级：{{call-vs2.body.items[0].priority}}
+            - 待办状态：{{call-vs2.body.items[0].task_status}}
+            - 任务对象：{{call-vs2.body.items[0].name}}
+            - 业务影响：{{call-vs2.body.items[0].business_impact}}
+            - 目标角色：{{call-vs2.body.items[0].target_roles}}
+
+            可继续进入事件分级、响应动作编排和证据核验。
+      - id: answer-vs3
+        position:
+          x: 1120
+          y: 180
+        data:
+          desc: ''
+          title: VS3 Output
+          type: answer
+          variables: []
+          answer: |
+            已受理任务，首屏分流信息如下：
+            - 场景类型：{{call-vs3.body.items[0].scene_type}}
+            - 严重度：{{call-vs3.body.items[0].severity}}
+            - 优先级：{{call-vs3.body.items[0].priority}}
+            - 待办状态：{{call-vs3.body.items[0].task_status}}
+            - 任务对象：{{call-vs3.body.items[0].name}}
+            - 业务影响：{{call-vs3.body.items[0].business_impact}}
+            - 目标角色：{{call-vs3.body.items[0].target_roles}}
+
+            可继续进入影响范围确认、窗口期建议和决策摘要生成。
+      - id: answer-vs4
+        position:
+          x: 1120
+          y: 260
+        data:
+          desc: ''
+          title: VS4 Output
+          type: answer
+          variables: []
+          answer: |
+            已受理任务，首屏分流信息如下：
+            - 场景类型：{{call-vs4.body.items[0].scene_type}}
+            - 严重度：{{call-vs4.body.items[0].severity}}
+            - 优先级：{{call-vs4.body.items[0].priority}}
+            - 待办状态：{{call-vs4.body.items[0].task_status}}
+            - 任务对象：{{call-vs4.body.items[0].name}}
+            - 业务影响：{{call-vs4.body.items[0].business_impact}}
+            - 目标角色：{{call-vs4.body.items[0].target_roles}}
+
+            可继续进入规则草案确认、上线动作和命中反馈校准。
 metadata:
   architecture:
     '# @ArchitectureID': '1214'

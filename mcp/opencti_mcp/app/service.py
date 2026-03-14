@@ -55,7 +55,10 @@ PROJECTION_FIELDS: dict[str, set[str]] = {
         "standard_id",
         "name",
         "description",
+        "scene_type",
         "severity",
+        "priority",
+        "task_status",
         "business_impact",
         "target_roles",
     },
@@ -181,7 +184,10 @@ class OpenCTIProjectionService:
             "external_references": [],
             "object_marking_refs": [],
             "extensions": {},
+            "scene_type": self._scene_type_for_object(data.get("entity_type", object_type), object_id),
             "severity": "high",
+            "priority": self._priority_for_severity("high"),
+            "task_status": "待处理",
             "business_impact": "Pending analyst review.",
             "target_roles": ["情报分析师"],
             "relationships": [],
@@ -190,6 +196,8 @@ class OpenCTIProjectionService:
     def _mock_object(self, object_id: str, object_type: str | None) -> dict[str, Any]:
         """// @ArchitectureID: 1215"""
         normalized_type = object_type or object_id.split("--", 1)[0]
+        scene_type = self._scene_type_for_object(normalized_type, object_id)
+        severity = self._severity_for_object(normalized_type, object_id)
         return {
             "id": object_id,
             "type": normalized_type,
@@ -202,7 +210,10 @@ class OpenCTIProjectionService:
             "external_references": [{"source_name": "mock-source", "url": "https://example.test"}],
             "object_marking_refs": ["marking-definition--tlp-clear"],
             "extensions": {"x_ai4sec_scene": normalized_type},
-            "severity": "high",
+            "scene_type": scene_type,
+            "severity": severity,
+            "priority": self._priority_for_severity(severity),
+            "task_status": "待处理",
             "business_impact": "Production-facing scenario requiring coordinated follow-up.",
             "target_roles": ["情报分析师", "安全负责人"],
             "relationships": [
@@ -214,3 +225,44 @@ class OpenCTIProjectionService:
                 }
             ],
         }
+
+    def _scene_type_for_object(self, object_type: str | None, object_id: str) -> str:
+        """// @ArchitectureID: 1215"""
+        normalized = (object_type or object_id.split("--", 1)[0] or "").lower()
+        if object_id.endswith("--vs1") or normalized == "attack-pattern":
+            return "威胁建模"
+        if object_id.endswith("--vs2") or normalized == "incident":
+            return "运营响应"
+        if object_id.endswith("--vs3") or normalized == "vulnerability":
+            return "漏洞影响"
+        if object_id.endswith("--vs4") or normalized == "indicator":
+            return "环境监控"
+        return "待分析"
+
+    def _severity_for_object(self, object_type: str | None, object_id: str) -> str:
+        """// @ArchitectureID: 1215"""
+        if object_id.endswith("--vs3"):
+            return "critical"
+        if object_id.endswith("--vs2"):
+            return "high"
+        if object_id.endswith("--vs1"):
+            return "high"
+        if object_id.endswith("--vs4"):
+            return "medium"
+        normalized = (object_type or "").lower()
+        if normalized == "vulnerability":
+            return "critical"
+        if normalized in {"incident", "attack-pattern"}:
+            return "high"
+        return "medium"
+
+    def _priority_for_severity(self, severity: str) -> str:
+        """// @ArchitectureID: 1215"""
+        normalized = severity.lower()
+        if normalized in {"critical", "critical+"}:
+            return "P1"
+        if normalized == "high":
+            return "P2"
+        if normalized == "medium":
+            return "P3"
+        return "P4"
