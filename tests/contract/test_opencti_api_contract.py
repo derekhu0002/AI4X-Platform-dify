@@ -1,4 +1,8 @@
+import os
+
 from fastapi.testclient import TestClient
+
+os.environ["OPENCTI_MCP_MOCK_MODE"] = "true"
 
 from mcp.opencti_mcp.app.main import app
 

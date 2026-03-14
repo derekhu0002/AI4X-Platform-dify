@@ -1,10 +1,18 @@
 import asyncio
+import importlib
+import os
 
 from fastapi.testclient import TestClient
 
+os.environ["OPENCTI_MCP_MOCK_MODE"] = "true"
+os.environ["NOTIFICATION_MCP_PREVIEW_MODE"] = "true"
+
 from DifyAgentWorkflow.tools.ai4sec_runtime_tools import build_notification_payload, resolve_opencti_signal, route_entrypoint
-from mcp.notification_mcp.app.main import app as notification_app
-from mcp.opencti_mcp.app.main import app as opencti_app
+from mcp.notification_mcp.app import main as notification_main
+from mcp.opencti_mcp.app import main as opencti_main
+
+notification_app = importlib.reload(notification_main).app
+opencti_app = importlib.reload(opencti_main).app
 
 
 opencti_client = TestClient(opencti_app)
