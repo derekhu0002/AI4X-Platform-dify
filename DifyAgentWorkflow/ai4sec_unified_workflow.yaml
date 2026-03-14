@@ -56,6 +56,11 @@ workflow:
         sourceHandle: vs4
         target: call-vs4
         targetHandle: target
+      - id: edge-router-fallback
+        source: route-intent
+        sourceHandle: false
+        target: answer_router_fallback
+        targetHandle: target
       - id: edge-vs1-answer
         source: call-vs1
         sourceHandle: source
@@ -148,9 +153,16 @@ workflow:
                   varType: string
                   variable_selector:
                     - start-node
-                    - user_request
+                    - sys.query
                   comparison_operator: contains
                   value: 威胁建模
+                - id: vs1-query-launch
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 上线前
             - case_id: vs2
               logical_operator: or
               conditions:
@@ -165,9 +177,30 @@ workflow:
                   varType: string
                   variable_selector:
                     - start-node
-                    - user_request
+                    - sys.query
                   comparison_operator: contains
                   value: 响应
+                - id: vs2-alert
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 告警
+                - id: vs2-lateral-movement
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 横向移动
+                - id: vs2-intake
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 任务受理
             - case_id: vs3
               logical_operator: or
               conditions:
@@ -182,9 +215,16 @@ workflow:
                   varType: string
                   variable_selector:
                     - start-node
-                    - user_request
+                    - sys.query
                   comparison_operator: contains
                   value: 漏洞
+                - id: vs3-impact
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 企业影响
             - case_id: vs4
               logical_operator: or
               conditions:
@@ -199,9 +239,16 @@ workflow:
                   varType: string
                   variable_selector:
                     - start-node
-                    - user_request
+                    - sys.query
                   comparison_operator: contains
                   value: 监控
+                - id: vs4-rule
+                  varType: string
+                  variable_selector:
+                    - start-node
+                    - sys.query
+                  comparison_operator: contains
+                  value: 风险转成环境监控任务
       - id: call-vs1
         position:
           x: 760
@@ -622,6 +669,25 @@ workflow:
             - 目标角色：{{#parse_vs4.target_roles_text#}}
 
             可继续进入规则草案确认、上线动作和命中反馈校准。
+      - id: answer_router_fallback
+        position:
+          x: 1200
+          y: 360
+        data:
+          desc: ''
+          title: Router Fallback
+          type: answer
+          variables: []
+          answer: |
+            当前输入未命中预置场景分流规则，因此没有自动生成任务。
+
+            请改用以下任一表达后重试：
+            - 威胁建模：包含“威胁建模”或“上线前”
+            - 运营响应：包含“响应”“告警”“横向移动”或“任务受理”
+            - 漏洞影响：包含“漏洞”或“企业影响”
+            - 环境监控：包含“监控”或“环境监控任务”
+
+            如需精确路由，也可以直接在入口选择 VS1、VS2、VS3 或 VS4。
 metadata:
   architecture:
     '# @ArchitectureID': '1214'
