@@ -77,7 +77,7 @@
       "modified": "2026-03-14T12:00:00.000Z",
       "relationship_type": "targets",
       "source_ref": "attack-pattern--39c8f829-a85d-4dbf-8741-c9c63c7be9b5",
-      "target_ref": "software--8d5c9e89-3d17-4e1c-a24f-820f24cd5375"
+      "target_ref": "identity--8e31db31-0ab5-4e7d-a057-a96bce3c8080"
     },
     {
       "type": "relationship",
@@ -86,8 +86,8 @@
       "created": "2026-03-14T12:00:00.000Z",
       "modified": "2026-03-14T12:00:00.000Z",
       "relationship_type": "hosts",
-      "source_ref": "software--8d5c9e89-3d17-4e1c-a24f-820f24cd5375",
-      "target_ref": "infrastructure--37723d17-2f90-4938-8c2d-a01566121434"
+      "source_ref": "infrastructure--37723d17-2f90-4938-8c2d-a01566121434",
+      "target_ref": "software--8d5c9e89-3d17-4e1c-a24f-820f24cd5375"
     },
     {
       "type": "relationship",

@@ -51,9 +51,9 @@
       "id": "relationship--7f452ece-dbc1-4ca3-a543-916d9032c99d",
       "created": "2026-03-14T12:00:00.000Z",
       "modified": "2026-03-14T12:00:00.000Z",
-      "relationship_type": "affects",
-      "source_ref": "vulnerability--3d9a4704-5cf5-4b6f-b328-9ff2a55115f6",
-      "target_ref": "software--c57c3461-1656-438f-8411-58302a286717"
+      "relationship_type": "has",
+      "source_ref": "software--c57c3461-1656-438f-8411-58302a286717",
+      "target_ref": "vulnerability--3d9a4704-5cf5-4b6f-b328-9ff2a55115f6"
     },
     {
       "type": "relationship",
@@ -62,8 +62,8 @@
       "created": "2026-03-14T12:00:00.000Z",
       "modified": "2026-03-14T12:00:00.000Z",
       "relationship_type": "hosts",
-      "source_ref": "software--c57c3461-1656-438f-8411-58302a286717",
-      "target_ref": "infrastructure--09258a66-86f8-4b19-85f1-abf286986561"
+      "source_ref": "infrastructure--09258a66-86f8-4b19-85f1-abf286986561",
+      "target_ref": "software--c57c3461-1656-438f-8411-58302a286717"
     },
     {
       "type": "relationship",

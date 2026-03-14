@@ -21,7 +21,7 @@
 | 文件位置 | `tests/validation/test-data/vs1-payment-threat-model-bundle.json` |
 | 场景 | 支付域 `v2.8.0` 上线前威胁建模 |
 | 关键对象 | `Software(payment-gateway)`、`Infrastructure(prod-payment-cluster)`、`Identity(payments-team)`、`Attack-Pattern(credential-stuffing)`、`Vulnerability(CVE-2026-1001)`、`Course-of-Action(enable-step-up-auth)`、`Opinion(strongly-disagree)` |
-| 关键关系 | `Software -> Infrastructure (hosts)`、`Attack-Pattern -> Software (targets)`、`Course-of-Action -> Attack-Pattern (mitigates)` |
+| 关键关系 | `Infrastructure -> Software (hosts)`、`Attack-Pattern -> Identity (targets)`、`Course-of-Action -> Attack-Pattern (mitigates)` |
 | 重点属性样例 | `Software.version=2.8.0`、`Infrastructure.environment=prod`、`Opinion.opinion=strongly-disagree` |
 | 导入后核验点 | 支付相关资产、威胁模式、控制建议与发布判定能被同一任务链路追踪 |
 
@@ -45,7 +45,7 @@
 | 文件位置 | `tests/validation/test-data/vs3-zero-day-impact-bundle.json` |
 | 场景 | 外部零日转化为企业影响结论 |
 | 关键对象 | `Vulnerability(CVE-2026-XXXX)`、`Report(0day-advisory)`、`Software(api-gateway)`、`Infrastructure(prod-edge-cluster)`、`Identity(finance-bu)`、`Opinion(prioritize-immediately)`、`Note(executive-summary)` |
-| 关键关系 | `Vulnerability -> Software (affects)`、`Software -> Infrastructure (hosts)`、`Identity -> Infrastructure (owns)` |
+| 关键关系 | `Software -> Vulnerability (has)`、`Infrastructure -> Software (hosts)`、`Identity -> Infrastructure (owns)` |
 | 重点属性样例 | `Vulnerability.cvss_score=9.8`、`Infrastructure.environment=prod`、`Identity.sector=finance` |
 | 导入后核验点 | 受影响范围、业务关键度和管理层决策摘要可被同屏核验 |
 
@@ -57,7 +57,7 @@
 | 文件位置 | `tests/validation/test-data/vs4-bola-monitoring-bundle.json` |
 | 场景 | 设计期 BOLA 风险转化为运行期监控规则 |
 | 关键对象 | `Attack-Pattern(BOLA)`、`Software(user-profile-service)`、`Indicator(bola-jwt-mismatch)`、`Infrastructure(prod-api-cluster)`、`Note(rule-rationale)` |
-| 关键关系 | `Indicator -> Attack-Pattern (indicates)`、`Software -> Infrastructure (hosts)`、`Note -> Indicator (related-to)` |
+| 关键关系 | `Indicator -> Attack-Pattern (indicates)`、`Infrastructure -> Software (hosts)`、`Note` 通过 `object_refs` 关联监控线索与保护目标 |
 | 重点属性样例 | `Indicator.pattern_type=sigma`、`Indicator.valid_from=2026-03-14T10:00:00Z` |
 | 导入后核验点 | 规则来源、保护目标和命中解释可追溯到设计风险 |
 
