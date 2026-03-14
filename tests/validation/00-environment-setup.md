@@ -59,6 +59,7 @@ d:/projects/AI4X/AI4X-Platform-dify/.venv/Scripts/python.exe -m uvicorn mcp.noti
 
 - `http://localhost:8101/health` 可访问。
 - `http://localhost:8102/health` 可访问。
+- 若 Dify 运行在 Docker Desktop 容器中，工作流 HTTP 节点访问 MCP 时不能使用 `localhost`，应使用 `host.docker.internal`。
 
 ## 6. 导入 Dify 工作流
 
@@ -68,8 +69,13 @@ d:/projects/AI4X/AI4X-Platform-dify/.venv/Scripts/python.exe -m uvicorn mcp.noti
 
 导入后核对以下变量或等效配置：
 
-- `OPENCTI_MCP_URL=http://localhost:8101`
-- `NOTIFICATION_MCP_URL=http://localhost:8102`
+- `OPENCTI_MCP_URL=http://host.docker.internal:8101`
+- `NOTIFICATION_MCP_URL=http://host.docker.internal:8102`
+
+说明：
+
+- 浏览器和宿主机健康检查仍使用 `http://localhost:8101/health`、`http://localhost:8102/health`。
+- 但 Dify 工作流中的 HTTP 节点运行在容器内，因此访问宿主机上的 MCP 时需要使用 `host.docker.internal`；否则会出现 `Reached maximum retries (0) for URL http://localhost:8101/query` 之类的连接错误。
 
 ## 7. 导入测试数据
 

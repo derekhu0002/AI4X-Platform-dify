@@ -17,10 +17,10 @@ workflow:
       value_type: string
   environment_variables:
     - name: OPENCTI_MCP_URL
-      value: http://localhost:8101
+      value: http://host.docker.internal:8101
       value_type: string
     - name: NOTIFICATION_MCP_URL
-      value: http://localhost:8102
+      value: http://host.docker.internal:8102
       value_type: string
   features:
     opening_statement: 请选择业务流程，或直接描述你的安全情报需求，我会自动分流到 VS1/VS2/VS3/VS4。

@@ -204,9 +204,11 @@ d:/projects/AI4X/AI4X-Platform-dify/.venv/Scripts/python.exe -m uvicorn mcp.noti
 
 导入后需确认：
 
-- `OPENCTI_MCP_URL` 指向 `http://localhost:8101`
-- `NOTIFICATION_MCP_URL` 指向 `http://localhost:8102`
+- `OPENCTI_MCP_URL` 指向 `http://host.docker.internal:8101`
+- `NOTIFICATION_MCP_URL` 指向 `http://host.docker.internal:8102`
 - Webhook 路径使用 `/webhooks/opencti/threat-intelligence`
+
+说明：当 Dify 运行在 Docker Desktop 容器中时，工作流 HTTP 节点里的 `localhost` 指向容器本身，而不是宿主机，因此访问宿主机上的 MCP 服务需要使用 `host.docker.internal`。
 
 ### 5.6 启动外部平台容器
 
