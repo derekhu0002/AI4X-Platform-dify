@@ -1,871 +1,1147 @@
 app:
-  description: Unified AI4SEC workflow that routes four value-stream scenarios from one Dify asset.
-  icon: shield
+  description: Unified AI4SEC workflow that routes four value-stream scenarios from
+    one Dify asset.
+  icon: 🤖
   icon_background: '#E7F6EC'
   mode: advanced-chat
   name: AI4SEC Unified Workflow
   use_icon_as_answer_icon: false
+dependencies: []
 kind: app
-version: 0.3.0
+version: 0.6.0
 workflow:
   conversation_variables:
-    - name: selected_flow
-      value: ''
-      value_type: string
-    - name: routing_reason
-      value: ''
-      value_type: string
+  - description: ''
+    id: 4ff6b443-a304-40f9-b6bd-572fbafd7794
+    name: selected_flow
+    selector:
+    - conversation
+    - selected_flow
+    value: ''
+    value_type: string
+  - description: ''
+    id: a2e3123d-be5f-40ea-98a7-e39ef519036e
+    name: routing_reason
+    selector:
+    - conversation
+    - routing_reason
+    value: ''
+    value_type: string
   environment_variables:
-    - name: OPENCTI_MCP_URL
-      value: http://host.docker.internal:8101
-      value_type: string
-    - name: NOTIFICATION_MCP_URL
-      value: http://host.docker.internal:8102
-      value_type: string
+  - description: ''
+    id: 3f2de023-7aee-4c3e-9530-eb5c992f311a
+    name: OPENCTI_MCP_URL
+    selector:
+    - env
+    - OPENCTI_MCP_URL
+    value: http://host.docker.internal:8101
+    value_type: string
+  - description: ''
+    id: 37cb31d9-1781-42d3-9dc4-2d29af5246cb
+    name: NOTIFICATION_MCP_URL
+    selector:
+    - env
+    - NOTIFICATION_MCP_URL
+    value: http://host.docker.internal:8102
+    value_type: string
   features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
     opening_statement: 请选择业务流程，或直接描述你的安全情报需求，我会自动分流到 VS1/VS2/VS3/VS4。
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
     suggested_questions:
-      - 帮我做一次发布前威胁建模
-      - 分析一条横向移动告警并生成响应动作
-      - 评估外部漏洞对企业的影响
-      - 生成一条环境感知监控规则
+    - 帮我做一次发布前威胁建模
+    - 分析一条横向移动告警并生成响应动作
+    - 评估外部漏洞对企业的影响
+    - 生成一条环境感知监控规则
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
   graph:
     edges:
-      - id: edge-start-router
-        source: start-node
-        sourceHandle: source
-        target: route-intent
-        targetHandle: target
-      - id: edge-router-vs1
-        source: route-intent
-        sourceHandle: vs1
-        target: call-vs1
-        targetHandle: target
-      - id: edge-router-vs2
-        source: route-intent
-        sourceHandle: vs2
-        target: call-vs2
-        targetHandle: target
-      - id: edge-router-vs3
-        source: route-intent
-        sourceHandle: vs3
-        target: call-vs3
-        targetHandle: target
-      - id: edge-router-vs4
-        source: route-intent
-        sourceHandle: vs4
-        target: call-vs4
-        targetHandle: target
-      - id: edge-router-fallback
-        source: route-intent
-        sourceHandle: false
-        target: answer_router_fallback
-        targetHandle: target
-      - id: edge-vs1-answer
-        source: call-vs1
-        sourceHandle: source
-        target: parse_vs1
-        targetHandle: target
-      - id: edge-parse-vs1-answer
-        source: parse_vs1
-        sourceHandle: source
-        target: answer-vs1
-        targetHandle: target
-      - id: edge-vs2-answer
-        source: call-vs2
-        sourceHandle: source
-        target: parse_vs2
-        targetHandle: target
-      - id: edge-parse-vs2-answer
-        source: parse_vs2
-        sourceHandle: source
-        target: answer-vs2
-        targetHandle: target
-      - id: edge-vs3-answer
-        source: call-vs3
-        sourceHandle: source
-        target: parse_vs3
-        targetHandle: target
-      - id: edge-parse-vs3-answer
-        source: parse_vs3
-        sourceHandle: source
-        target: answer-vs3
-        targetHandle: target
-      - id: edge-vs4-answer
-        source: call-vs4
-        sourceHandle: source
-        target: parse_vs4
-        targetHandle: target
-      - id: edge-parse-vs4-answer
-        source: parse_vs4
-        sourceHandle: source
-        target: answer-vs4
-        targetHandle: target
+    - data:
+        sourceType: start
+        targetType: if-else
+      id: edge-start-router
+      source: start-node
+      sourceHandle: source
+      target: route-intent
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: http-request
+      id: edge-router-vs1
+      source: route-intent
+      sourceHandle: vs1
+      target: call-vs1
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: http-request
+      id: edge-router-vs2
+      source: route-intent
+      sourceHandle: vs2
+      target: call-vs2
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: http-request
+      id: edge-router-vs3
+      source: route-intent
+      sourceHandle: vs3
+      target: call-vs3
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: http-request
+      id: edge-router-vs4
+      source: route-intent
+      sourceHandle: vs4
+      target: call-vs4
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: answer
+      id: edge-router-fallback
+      source: route-intent
+      sourceHandle: source
+      target: answer_router_fallback
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: edge-vs1-answer
+      source: call-vs1
+      sourceHandle: source
+      target: parse_vs1
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: answer
+      id: edge-parse-vs1-answer
+      source: parse_vs1
+      sourceHandle: source
+      target: answer-vs1
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: edge-vs2-answer
+      source: call-vs2
+      sourceHandle: source
+      target: parse_vs2
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: answer
+      id: edge-parse-vs2-answer
+      source: parse_vs2
+      sourceHandle: source
+      target: answer-vs2
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: edge-vs3-answer
+      source: call-vs3
+      sourceHandle: source
+      target: parse_vs3
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: answer
+      id: edge-parse-vs3-answer
+      source: parse_vs3
+      sourceHandle: source
+      target: answer-vs3
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: code
+      id: edge-vs4-answer
+      source: call-vs4
+      sourceHandle: source
+      target: parse_vs4
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: answer
+      id: edge-parse-vs4-answer
+      source: parse_vs4
+      sourceHandle: source
+      target: answer-vs4
+      targetHandle: target
+      type: custom
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: answer
+      id: route-intent-false-answer_router_fallback-target
+      source: route-intent
+      sourceHandle: 'false'
+      target: answer_router_fallback
+      targetHandle: target
+      type: custom
+      zIndex: 0
     nodes:
-      - id: start-node
-        position:
-          x: 100
-          y: 120
-        data:
-          desc: ''
-          title: Unified Entry
-          type: start
-          variables:
-            - label: entry_mode
-              max_length: 64
-              required: false
-              type: text-input
-              variable: entry_mode
-            - label: user_request
-              max_length: 2000
-              required: false
-              type: paragraph
-              variable: user_request
-            - label: selected_flow
-              options:
-                - VS1
-                - VS2
-                - VS3
-                - VS4
-              required: false
-              type: select
-              variable: selected_flow
-      - id: route-intent
-        position:
-          x: 420
-          y: 120
-        data:
-          desc: ''
-          title: Route By Menu Or Intent
-          type: if-else
-          cases:
-            - case_id: vs1
-              logical_operator: or
-              conditions:
-                - id: vs1-selected-flow
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - selected_flow
-                  comparison_operator: '='
-                  value: VS1
-                - id: vs1-user-request
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 威胁建模
-                - id: vs1-query-launch
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 上线前
-            - case_id: vs2
-              logical_operator: or
-              conditions:
-                - id: vs2-selected-flow
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - selected_flow
-                  comparison_operator: '='
-                  value: VS2
-                - id: vs2-user-request
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 响应
-                - id: vs2-alert
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 告警
-                - id: vs2-lateral-movement
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 横向移动
-                - id: vs2-intake
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 任务受理
-            - case_id: vs3
-              logical_operator: or
-              conditions:
-                - id: vs3-selected-flow
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - selected_flow
-                  comparison_operator: '='
-                  value: VS3
-                - id: vs3-user-request
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 漏洞
-                - id: vs3-impact
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 企业影响
-                - id: vs3-cve
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: CVE-
-                - id: vs3-asset-mapping
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 映射到内部资产
-            - case_id: vs4
-              logical_operator: or
-              conditions:
-                - id: vs4-selected-flow
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - selected_flow
-                  comparison_operator: '='
-                  value: VS4
-                - id: vs4-user-request
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 监控
-                - id: vs4-rule
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 风险转成环境监控任务
-                - id: vs4-bola
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: BOLA
-                - id: vs4-business-asset
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 业务资产
-                - id: vs4-production-env
-                  varType: string
-                  variable_selector:
-                    - start-node
-                    - sys.query
-                  comparison_operator: contains
-                  value: 生产环境
-      - id: call-vs1
-        position:
-          x: 760
-          y: 0
-        data:
-          desc: ''
-          title: VS1 Threat Modeling
-          type: http-request
-          variables: []
-          method: post
-          url: '{{#env.OPENCTI_MCP_URL#}}/query'
-          authorization:
-            type: no-auth
-            config: null
-          headers: ''
-          params: ''
-          body:
-            type: json
-            data:
-              - type: text
-                value: '{"object_id":"attack-pattern--vs1","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
-          ssl_verify: true
-          timeout:
-            connect: 10
-            read: 600
-            write: 600
-            max_connect_timeout: 10
-            max_read_timeout: 600
-            max_write_timeout: 600
-          retry_config:
-            retry_enabled: true
-            max_retries: 3
-            retry_interval: 100
-      - id: parse_vs1
-        position:
-          x: 950
-          y: 0
-        data:
-          desc: ''
-          title: Parse VS1 Response
-          type: code
-          variables:
-            - variable: response_json
-              value_selector:
-                - call-vs1
-                - body
-          code_language: python3
-          code: |
-            import json
+    - data:
+        desc: ''
+        title: Unified Entry
+        type: start
+        variables:
+        - label: entry_mode
+          max_length: 64
+          required: false
+          type: text-input
+          variable: entry_mode
+        - label: user_request
+          max_length: 2000
+          required: false
+          type: paragraph
+          variable: user_request
+        - label: selected_flow
+          options:
+          - VS1
+          - VS2
+          - VS3
+          - VS4
+          required: false
+          type: select
+          variable: selected_flow
+      height: 161
+      id: start-node
+      position:
+        x: 30
+        y: 105
+      positionAbsolute:
+        x: 30
+        y: 105
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        cases:
+        - case_id: vs1
+          conditions:
+          - comparison_operator: '='
+            id: vs1-selected-flow
+            value: VS1
+            varType: string
+            variable_selector:
+            - start-node
+            - selected_flow
+          - comparison_operator: contains
+            id: vs1-user-request
+            value: 威胁建模
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs1-query-launch
+            value: 上线前
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          logical_operator: or
+        - case_id: vs2
+          conditions:
+          - comparison_operator: '='
+            id: vs2-selected-flow
+            value: VS2
+            varType: string
+            variable_selector:
+            - start-node
+            - selected_flow
+          - comparison_operator: contains
+            id: vs2-user-request
+            value: 响应
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs2-alert
+            value: 告警
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs2-lateral-movement
+            value: 横向移动
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs2-intake
+            value: 任务受理
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          logical_operator: or
+        - case_id: vs3
+          conditions:
+          - comparison_operator: '='
+            id: vs3-selected-flow
+            value: VS3
+            varType: string
+            variable_selector:
+            - start-node
+            - selected_flow
+          - comparison_operator: contains
+            id: vs3-user-request
+            value: 漏洞
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs3-impact
+            value: 企业影响
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs3-cve
+            value: CVE-
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs3-asset-mapping
+            value: 映射到内部资产
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          logical_operator: or
+        - case_id: vs4
+          conditions:
+          - comparison_operator: '='
+            id: vs4-selected-flow
+            value: VS4
+            varType: string
+            variable_selector:
+            - start-node
+            - selected_flow
+          - comparison_operator: contains
+            id: vs4-user-request
+            value: 监控
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs4-rule
+            value: 风险转成环境监控任务
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs4-bola
+            value: BOLA
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs4-business-asset
+            value: 业务资产
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs4-production-env
+            value: 生产环境
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          logical_operator: or
+        desc: ''
+        title: Route By Menu Or Intent
+        type: if-else
+      height: 658
+      id: route-intent
+      position:
+        x: 379
+        y: -56
+      positionAbsolute:
+        x: 379
+        y: -56
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - type: text
+            value: '{"object_id":"attack-pattern--vs1","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
+          type: json
+        desc: ''
+        headers: ''
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        ssl_verify: true
+        timeout:
+          connect: 10
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+          read: 600
+          write: 600
+        title: VS1 Threat Modeling
+        type: http-request
+        url: '{{#env.OPENCTI_MCP_URL#}}/query'
+        variables: []
+      height: 142
+      id: call-vs1
+      position:
+        x: 760
+        y: -56
+      positionAbsolute:
+        x: 760
+        y: -56
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(response_json: str) -> dict:\n    payload =\
+          \ json.loads(response_json)\n    item = (payload.get(\"items\") or [{}])[0]\n\
+          \    target_roles = item.get(\"target_roles\") or []\n    return {\n   \
+          \   \"risk_object\": str(item.get(\"risk_object\") or \"待识别风险对象\"),\n  \
+          \      \"scene_type\": str(item.get(\"scene_type\") or \"待分析\"),\n     \
+          \   \"severity\": str(item.get(\"severity\") or \"unknown\"),\n        \"\
+          priority\": str(item.get(\"priority\") or \"P4\"),\n        \"task_status\"\
+          : str(item.get(\"task_status\") or \"待处理\"),\n        \"name\": str(item.get(\"\
+          name\") or \"未命名任务\"),\n      \"primary_asset\": str(item.get(\"primary_asset\"\
+          ) or \"待补充资产\"),\n      \"deployment_scope\": str(item.get(\"deployment_scope\"\
+          ) or \"待补充部署范围\"),\n      \"owner_team\": str(item.get(\"owner_team\") or\
+          \ \"待分配团队\"),\n      \"business_domain\": str(item.get(\"business_domain\"\
+          ) or \"待补充业务域\"),\n      \"business_criticality\": str(item.get(\"business_criticality\"\
+          ) or \"待评估\"),\n      \"execution_window\": str(item.get(\"execution_window\"\
+          ) or \"待确认\"),\n        \"business_impact\": str(item.get(\"business_impact\"\
+          ) or \"待业务复核\"),\n        \"target_roles_text\": \"、\".join(str(role) for\
+          \ role in target_roles) if target_roles else \"情报分析师\",\n    }\n"
+        code_language: python3
+        desc: ''
+        outputs:
+          business_criticality:
+            children: null
+            type: string
+          business_domain:
+            children: null
+            type: string
+          business_impact:
+            children: null
+            type: string
+          deployment_scope:
+            children: null
+            type: string
+          execution_window:
+            children: null
+            type: string
+          name:
+            children: null
+            type: string
+          owner_team:
+            children: null
+            type: string
+          primary_asset:
+            children: null
+            type: string
+          priority:
+            children: null
+            type: string
+          risk_object:
+            children: null
+            type: string
+          scene_type:
+            children: null
+            type: string
+          severity:
+            children: null
+            type: string
+          target_roles_text:
+            children: null
+            type: string
+          task_status:
+            children: null
+            type: string
+        title: Parse VS1 Response
+        type: code
+        variables:
+        - value_selector:
+          - call-vs1
+          - body
+          variable: response_json
+      height: 52
+      id: parse_vs1
+      position:
+        x: 950
+        y: 0
+      positionAbsolute:
+        x: 950
+        y: 0
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - type: text
+            value: '{"object_id":"incident--vs2","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
+          type: json
+        desc: ''
+        headers: ''
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        ssl_verify: true
+        timeout:
+          connect: 10
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+          read: 600
+          write: 600
+        title: VS2 Incident Response
+        type: http-request
+        url: '{{#env.OPENCTI_MCP_URL#}}/query'
+        variables: []
+      height: 142
+      id: call-vs2
+      position:
+        x: 760
+        y: 100
+      positionAbsolute:
+        x: 760
+        y: 100
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(response_json: str) -> dict:\n    payload =\
+          \ json.loads(response_json)\n    item = (payload.get(\"items\") or [{}])[0]\n\
+          \    target_roles = item.get(\"target_roles\") or []\n    return {\n   \
+          \   \"risk_object\": str(item.get(\"risk_object\") or \"待识别风险对象\"),\n  \
+          \      \"scene_type\": str(item.get(\"scene_type\") or \"待分析\"),\n     \
+          \   \"severity\": str(item.get(\"severity\") or \"unknown\"),\n        \"\
+          priority\": str(item.get(\"priority\") or \"P4\"),\n        \"task_status\"\
+          : str(item.get(\"task_status\") or \"待处理\"),\n        \"name\": str(item.get(\"\
+          name\") or \"未命名任务\"),\n      \"primary_asset\": str(item.get(\"primary_asset\"\
+          ) or \"待补充资产\"),\n      \"deployment_scope\": str(item.get(\"deployment_scope\"\
+          ) or \"待补充部署范围\"),\n      \"owner_team\": str(item.get(\"owner_team\") or\
+          \ \"待分配团队\"),\n      \"business_domain\": str(item.get(\"business_domain\"\
+          ) or \"待补充业务域\"),\n      \"business_criticality\": str(item.get(\"business_criticality\"\
+          ) or \"待评估\"),\n      \"execution_window\": str(item.get(\"execution_window\"\
+          ) or \"待确认\"),\n        \"business_impact\": str(item.get(\"business_impact\"\
+          ) or \"待业务复核\"),\n        \"target_roles_text\": \"、\".join(str(role) for\
+          \ role in target_roles) if target_roles else \"情报分析师\",\n    }\n"
+        code_language: python3
+        desc: ''
+        outputs:
+          business_criticality:
+            children: null
+            type: string
+          business_domain:
+            children: null
+            type: string
+          business_impact:
+            children: null
+            type: string
+          deployment_scope:
+            children: null
+            type: string
+          execution_window:
+            children: null
+            type: string
+          name:
+            children: null
+            type: string
+          owner_team:
+            children: null
+            type: string
+          primary_asset:
+            children: null
+            type: string
+          priority:
+            children: null
+            type: string
+          risk_object:
+            children: null
+            type: string
+          scene_type:
+            children: null
+            type: string
+          severity:
+            children: null
+            type: string
+          target_roles_text:
+            children: null
+            type: string
+          task_status:
+            children: null
+            type: string
+        title: Parse VS2 Response
+        type: code
+        variables:
+        - value_selector:
+          - call-vs2
+          - body
+          variable: response_json
+      height: 52
+      id: parse_vs2
+      position:
+        x: 950
+        y: 100
+      positionAbsolute:
+        x: 950
+        y: 100
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - type: text
+            value: '{"object_id":"vulnerability--vs3","projection_profile":"notification","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":false}'
+          type: json
+        desc: ''
+        headers: ''
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        ssl_verify: true
+        timeout:
+          connect: 10
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+          read: 600
+          write: 600
+        title: VS3 Vulnerability Intelligence
+        type: http-request
+        url: '{{#env.OPENCTI_MCP_URL#}}/query'
+        variables: []
+      height: 142
+      id: call-vs3
+      position:
+        x: 760
+        y: 200
+      positionAbsolute:
+        x: 760
+        y: 200
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(response_json: str) -> dict:\n    payload =\
+          \ json.loads(response_json)\n    item = (payload.get(\"items\") or [{}])[0]\n\
+          \    target_roles = item.get(\"target_roles\") or []\n    return {\n   \
+          \   \"risk_object\": str(item.get(\"risk_object\") or \"待识别风险对象\"),\n  \
+          \      \"scene_type\": str(item.get(\"scene_type\") or \"待分析\"),\n     \
+          \   \"severity\": str(item.get(\"severity\") or \"unknown\"),\n        \"\
+          priority\": str(item.get(\"priority\") or \"P4\"),\n        \"task_status\"\
+          : str(item.get(\"task_status\") or \"待处理\"),\n        \"name\": str(item.get(\"\
+          name\") or \"未命名任务\"),\n      \"primary_asset\": str(item.get(\"primary_asset\"\
+          ) or \"待补充资产\"),\n      \"deployment_scope\": str(item.get(\"deployment_scope\"\
+          ) or \"待补充部署范围\"),\n      \"owner_team\": str(item.get(\"owner_team\") or\
+          \ \"待分配团队\"),\n      \"business_domain\": str(item.get(\"business_domain\"\
+          ) or \"待补充业务域\"),\n      \"business_criticality\": str(item.get(\"business_criticality\"\
+          ) or \"待评估\"),\n      \"execution_window\": str(item.get(\"execution_window\"\
+          ) or \"待确认\"),\n        \"business_impact\": str(item.get(\"business_impact\"\
+          ) or \"待业务复核\"),\n        \"target_roles_text\": \"、\".join(str(role) for\
+          \ role in target_roles) if target_roles else \"情报分析师\",\n    }\n"
+        code_language: python3
+        desc: ''
+        outputs:
+          business_criticality:
+            children: null
+            type: string
+          business_domain:
+            children: null
+            type: string
+          business_impact:
+            children: null
+            type: string
+          deployment_scope:
+            children: null
+            type: string
+          execution_window:
+            children: null
+            type: string
+          name:
+            children: null
+            type: string
+          owner_team:
+            children: null
+            type: string
+          primary_asset:
+            children: null
+            type: string
+          priority:
+            children: null
+            type: string
+          risk_object:
+            children: null
+            type: string
+          scene_type:
+            children: null
+            type: string
+          severity:
+            children: null
+            type: string
+          target_roles_text:
+            children: null
+            type: string
+          task_status:
+            children: null
+            type: string
+        title: Parse VS3 Response
+        type: code
+        variables:
+        - value_selector:
+          - call-vs3
+          - body
+          variable: response_json
+      height: 52
+      id: parse_vs3
+      position:
+        x: 950
+        y: 200
+      positionAbsolute:
+        x: 950
+        y: 200
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - type: text
+            value: '{"object_id":"indicator--vs4","projection_profile":"graph","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
+          type: json
+        desc: ''
+        headers: ''
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        ssl_verify: true
+        timeout:
+          connect: 10
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+          read: 600
+          write: 600
+        title: VS4 Monitoring Rules
+        type: http-request
+        url: '{{#env.OPENCTI_MCP_URL#}}/query'
+        variables: []
+      height: 142
+      id: call-vs4
+      position:
+        x: 760
+        y: 358
+      positionAbsolute:
+        x: 760
+        y: 358
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(response_json: str) -> dict:\n    payload =\
+          \ json.loads(response_json)\n    item = (payload.get(\"items\") or [{}])[0]\n\
+          \    target_roles = item.get(\"target_roles\") or []\n    return {\n   \
+          \   \"risk_object\": str(item.get(\"risk_object\") or \"待识别风险对象\"),\n  \
+          \      \"scene_type\": str(item.get(\"scene_type\") or \"待分析\"),\n     \
+          \   \"severity\": str(item.get(\"severity\") or \"unknown\"),\n        \"\
+          priority\": str(item.get(\"priority\") or \"P4\"),\n        \"task_status\"\
+          : str(item.get(\"task_status\") or \"待处理\"),\n        \"name\": str(item.get(\"\
+          name\") or \"未命名任务\"),\n      \"primary_asset\": str(item.get(\"primary_asset\"\
+          ) or \"待补充资产\"),\n      \"deployment_scope\": str(item.get(\"deployment_scope\"\
+          ) or \"待补充部署范围\"),\n      \"owner_team\": str(item.get(\"owner_team\") or\
+          \ \"待分配团队\"),\n      \"business_domain\": str(item.get(\"business_domain\"\
+          ) or \"待补充业务域\"),\n      \"business_criticality\": str(item.get(\"business_criticality\"\
+          ) or \"待评估\"),\n      \"execution_window\": str(item.get(\"execution_window\"\
+          ) or \"待确认\"),\n        \"business_impact\": str(item.get(\"business_impact\"\
+          ) or \"待业务复核\"),\n        \"target_roles_text\": \"、\".join(str(role) for\
+          \ role in target_roles) if target_roles else \"情报分析师\",\n    }\n"
+        code_language: python3
+        desc: ''
+        outputs:
+          business_criticality:
+            children: null
+            type: string
+          business_domain:
+            children: null
+            type: string
+          business_impact:
+            children: null
+            type: string
+          deployment_scope:
+            children: null
+            type: string
+          execution_window:
+            children: null
+            type: string
+          name:
+            children: null
+            type: string
+          owner_team:
+            children: null
+            type: string
+          primary_asset:
+            children: null
+            type: string
+          priority:
+            children: null
+            type: string
+          risk_object:
+            children: null
+            type: string
+          scene_type:
+            children: null
+            type: string
+          severity:
+            children: null
+            type: string
+          target_roles_text:
+            children: null
+            type: string
+          task_status:
+            children: null
+            type: string
+        title: Parse VS4 Response
+        type: code
+        variables:
+        - value_selector:
+          - call-vs4
+          - body
+          variable: response_json
+      height: 52
+      id: parse_vs4
+      position:
+        x: 950
+        y: 300
+      positionAbsolute:
+        x: 950
+        y: 300
+      type: custom
+      width: 242
+    - data:
+        answer: '已受理任务，首屏分流信息如下：
 
-            def main(response_json: str) -> dict:
-                payload = json.loads(response_json)
-                item = (payload.get("items") or [{}])[0]
-                target_roles = item.get("target_roles") or []
-                return {
-                  "risk_object": str(item.get("risk_object") or "待识别风险对象"),
-                    "scene_type": str(item.get("scene_type") or "待分析"),
-                    "severity": str(item.get("severity") or "unknown"),
-                    "priority": str(item.get("priority") or "P4"),
-                    "task_status": str(item.get("task_status") or "待处理"),
-                    "name": str(item.get("name") or "未命名任务"),
-                  "primary_asset": str(item.get("primary_asset") or "待补充资产"),
-                  "deployment_scope": str(item.get("deployment_scope") or "待补充部署范围"),
-                  "owner_team": str(item.get("owner_team") or "待分配团队"),
-                  "business_domain": str(item.get("business_domain") or "待补充业务域"),
-                  "business_criticality": str(item.get("business_criticality") or "待评估"),
-                  "execution_window": str(item.get("execution_window") or "待确认"),
-                    "business_impact": str(item.get("business_impact") or "待业务复核"),
-                    "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
-                }
-          outputs:
-            scene_type:
-              type: string
-              children: null
-            risk_object:
-              type: string
-              children: null
-            severity:
-              type: string
-              children: null
-            priority:
-              type: string
-              children: null
-            task_status:
-              type: string
-              children: null
-            name:
-              type: string
-              children: null
-            primary_asset:
-              type: string
-              children: null
-            deployment_scope:
-              type: string
-              children: null
-            owner_team:
-              type: string
-              children: null
-            business_domain:
-              type: string
-              children: null
-            business_criticality:
-              type: string
-              children: null
-            execution_window:
-              type: string
-              children: null
-            business_impact:
-              type: string
-              children: null
-            target_roles_text:
-              type: string
-              children: null
-      - id: call-vs2
-        position:
-          x: 760
-          y: 100
-        data:
-          desc: ''
-          title: VS2 Incident Response
-          type: http-request
-          variables: []
-          method: post
-          url: '{{#env.OPENCTI_MCP_URL#}}/query'
-          authorization:
-            type: no-auth
-            config: null
-          headers: ''
-          params: ''
-          body:
-            type: json
-            data:
-              - type: text
-                value: '{"object_id":"incident--vs2","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
-          ssl_verify: true
-          timeout:
-            connect: 10
-            read: 600
-            write: 600
-            max_connect_timeout: 10
-            max_read_timeout: 600
-            max_write_timeout: 600
-          retry_config:
-            retry_enabled: true
-            max_retries: 3
-            retry_interval: 100
-      - id: parse_vs2
-        position:
-          x: 950
-          y: 100
-        data:
-          desc: ''
-          title: Parse VS2 Response
-          type: code
-          variables:
-            - variable: response_json
-              value_selector:
-                - call-vs2
-                - body
-          code_language: python3
-          code: |
-            import json
+          - 场景类型：{{#parse_vs1.scene_type#}}
 
-            def main(response_json: str) -> dict:
-                payload = json.loads(response_json)
-                item = (payload.get("items") or [{}])[0]
-                target_roles = item.get("target_roles") or []
-                return {
-                  "risk_object": str(item.get("risk_object") or "待识别风险对象"),
-                    "scene_type": str(item.get("scene_type") or "待分析"),
-                    "severity": str(item.get("severity") or "unknown"),
-                    "priority": str(item.get("priority") or "P4"),
-                    "task_status": str(item.get("task_status") or "待处理"),
-                    "name": str(item.get("name") or "未命名任务"),
-                  "primary_asset": str(item.get("primary_asset") or "待补充资产"),
-                  "deployment_scope": str(item.get("deployment_scope") or "待补充部署范围"),
-                  "owner_team": str(item.get("owner_team") or "待分配团队"),
-                  "business_domain": str(item.get("business_domain") or "待补充业务域"),
-                  "business_criticality": str(item.get("business_criticality") or "待评估"),
-                  "execution_window": str(item.get("execution_window") or "待确认"),
-                    "business_impact": str(item.get("business_impact") or "待业务复核"),
-                    "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
-                }
-          outputs:
-            scene_type:
-              type: string
-              children: null
-            risk_object:
-              type: string
-              children: null
-            severity:
-              type: string
-              children: null
-            priority:
-              type: string
-              children: null
-            task_status:
-              type: string
-              children: null
-            name:
-              type: string
-              children: null
-            primary_asset:
-              type: string
-              children: null
-            deployment_scope:
-              type: string
-              children: null
-            owner_team:
-              type: string
-              children: null
-            business_domain:
-              type: string
-              children: null
-            business_criticality:
-              type: string
-              children: null
-            execution_window:
-              type: string
-              children: null
-            business_impact:
-              type: string
-              children: null
-            target_roles_text:
-              type: string
-              children: null
-      - id: call-vs3
-        position:
-          x: 760
-          y: 200
-        data:
-          desc: ''
-          title: VS3 Vulnerability Intelligence
-          type: http-request
-          variables: []
-          method: post
-          url: '{{#env.OPENCTI_MCP_URL#}}/query'
-          authorization:
-            type: no-auth
-            config: null
-          headers: ''
-          params: ''
-          body:
-            type: json
-            data:
-              - type: text
-                value: '{"object_id":"vulnerability--vs3","projection_profile":"notification","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":false}'
-          ssl_verify: true
-          timeout:
-            connect: 10
-            read: 600
-            write: 600
-            max_connect_timeout: 10
-            max_read_timeout: 600
-            max_write_timeout: 600
-          retry_config:
-            retry_enabled: true
-            max_retries: 3
-            retry_interval: 100
-      - id: parse_vs3
-        position:
-          x: 950
-          y: 200
-        data:
-          desc: ''
-          title: Parse VS3 Response
-          type: code
-          variables:
-            - variable: response_json
-              value_selector:
-                - call-vs3
-                - body
-          code_language: python3
-          code: |
-            import json
+          - 严重度：{{#parse_vs1.severity#}}
 
-            def main(response_json: str) -> dict:
-                payload = json.loads(response_json)
-                item = (payload.get("items") or [{}])[0]
-                target_roles = item.get("target_roles") or []
-                return {
-                  "risk_object": str(item.get("risk_object") or "待识别风险对象"),
-                    "scene_type": str(item.get("scene_type") or "待分析"),
-                    "severity": str(item.get("severity") or "unknown"),
-                    "priority": str(item.get("priority") or "P4"),
-                    "task_status": str(item.get("task_status") or "待处理"),
-                    "name": str(item.get("name") or "未命名任务"),
-                  "primary_asset": str(item.get("primary_asset") or "待补充资产"),
-                  "deployment_scope": str(item.get("deployment_scope") or "待补充部署范围"),
-                  "owner_team": str(item.get("owner_team") or "待分配团队"),
-                  "business_domain": str(item.get("business_domain") or "待补充业务域"),
-                  "business_criticality": str(item.get("business_criticality") or "待评估"),
-                  "execution_window": str(item.get("execution_window") or "待确认"),
-                    "business_impact": str(item.get("business_impact") or "待业务复核"),
-                    "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
-                }
-          outputs:
-            scene_type:
-              type: string
-              children: null
-            risk_object:
-              type: string
-              children: null
-            severity:
-              type: string
-              children: null
-            priority:
-              type: string
-              children: null
-            task_status:
-              type: string
-              children: null
-            name:
-              type: string
-              children: null
-            primary_asset:
-              type: string
-              children: null
-            deployment_scope:
-              type: string
-              children: null
-            owner_team:
-              type: string
-              children: null
-            business_domain:
-              type: string
-              children: null
-            business_criticality:
-              type: string
-              children: null
-            execution_window:
-              type: string
-              children: null
-            business_impact:
-              type: string
-              children: null
-            target_roles_text:
-              type: string
-              children: null
-      - id: call-vs4
-        position:
-          x: 760
-          y: 300
-        data:
-          desc: ''
-          title: VS4 Monitoring Rules
-          type: http-request
-          variables: []
-          method: post
-          url: '{{#env.OPENCTI_MCP_URL#}}/query'
-          authorization:
-            type: no-auth
-            config: null
-          headers: ''
-          params: ''
-          body:
-            type: json
-            data:
-              - type: text
-                value: '{"object_id":"indicator--vs4","projection_profile":"graph","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
-          ssl_verify: true
-          timeout:
-            connect: 10
-            read: 600
-            write: 600
-            max_connect_timeout: 10
-            max_read_timeout: 600
-            max_write_timeout: 600
-          retry_config:
-            retry_enabled: true
-            max_retries: 3
-            retry_interval: 100
-      - id: parse_vs4
-        position:
-          x: 950
-          y: 300
-        data:
-          desc: ''
-          title: Parse VS4 Response
-          type: code
-          variables:
-            - variable: response_json
-              value_selector:
-                - call-vs4
-                - body
-          code_language: python3
-          code: |
-            import json
+          - 优先级：{{#parse_vs1.priority#}}
 
-            def main(response_json: str) -> dict:
-                payload = json.loads(response_json)
-                item = (payload.get("items") or [{}])[0]
-                target_roles = item.get("target_roles") or []
-                return {
-                  "risk_object": str(item.get("risk_object") or "待识别风险对象"),
-                    "scene_type": str(item.get("scene_type") or "待分析"),
-                    "severity": str(item.get("severity") or "unknown"),
-                    "priority": str(item.get("priority") or "P4"),
-                    "task_status": str(item.get("task_status") or "待处理"),
-                    "name": str(item.get("name") or "未命名任务"),
-                  "primary_asset": str(item.get("primary_asset") or "待补充资产"),
-                  "deployment_scope": str(item.get("deployment_scope") or "待补充部署范围"),
-                  "owner_team": str(item.get("owner_team") or "待分配团队"),
-                  "business_domain": str(item.get("business_domain") or "待补充业务域"),
-                  "business_criticality": str(item.get("business_criticality") or "待评估"),
-                  "execution_window": str(item.get("execution_window") or "待确认"),
-                    "business_impact": str(item.get("business_impact") or "待业务复核"),
-                    "target_roles_text": "、".join(str(role) for role in target_roles) if target_roles else "情报分析师",
-                }
-          outputs:
-            scene_type:
-              type: string
-              children: null
-            risk_object:
-              type: string
-              children: null
-            severity:
-              type: string
-              children: null
-            priority:
-              type: string
-              children: null
-            task_status:
-              type: string
-              children: null
-            name:
-              type: string
-              children: null
-            primary_asset:
-              type: string
-              children: null
-            deployment_scope:
-              type: string
-              children: null
-            owner_team:
-              type: string
-              children: null
-            business_domain:
-              type: string
-              children: null
-            business_criticality:
-              type: string
-              children: null
-            execution_window:
-              type: string
-              children: null
-            business_impact:
-              type: string
-              children: null
-            target_roles_text:
-              type: string
-              children: null
-      - id: answer-vs1
-        position:
-          x: 1200
-          y: 20
-        data:
-          desc: ''
-          title: VS1 Output
-          type: answer
-          variables: []
-          answer: |
-            已受理任务，首屏分流信息如下：
-            - 场景类型：{{#parse_vs1.scene_type#}}
-            - 严重度：{{#parse_vs1.severity#}}
-            - 优先级：{{#parse_vs1.priority#}}
-            - 待办状态：{{#parse_vs1.task_status#}}
-            - 任务对象：{{#parse_vs1.name#}}
-            - 关键资产：{{#parse_vs1.primary_asset#}}
-            - 部署范围：{{#parse_vs1.deployment_scope#}}
-            - 责任团队：{{#parse_vs1.owner_team#}}
-            - 业务域：{{#parse_vs1.business_domain#}}
-            - 业务关键度：{{#parse_vs1.business_criticality#}}
-            - 当前窗口：{{#parse_vs1.execution_window#}}
-            - 业务影响：{{#parse_vs1.business_impact#}}
-            - 目标角色：{{#parse_vs1.target_roles_text#}}
+          - 待办状态：{{#parse_vs1.task_status#}}
 
-            可继续进入发布判定、控制缺口复核和证据核验。
-      - id: answer-vs2
-        position:
-          x: 1200
-          y: 100
-        data:
-          desc: ''
-          title: VS2 Output
-          type: answer
-          variables: []
-          answer: |
-            已受理任务，首屏分流信息如下：
-            - 场景类型：{{#parse_vs2.scene_type#}}
-            - 严重度：{{#parse_vs2.severity#}}
-            - 优先级：{{#parse_vs2.priority#}}
-            - 待办状态：{{#parse_vs2.task_status#}}
-            - 任务对象：{{#parse_vs2.name#}}
-            - 关键资产：{{#parse_vs2.primary_asset#}}
-            - 部署范围：{{#parse_vs2.deployment_scope#}}
-            - 责任团队：{{#parse_vs2.owner_team#}}
-            - 业务域：{{#parse_vs2.business_domain#}}
-            - 业务关键度：{{#parse_vs2.business_criticality#}}
-            - 当前窗口：{{#parse_vs2.execution_window#}}
-            - 业务影响：{{#parse_vs2.business_impact#}}
-            - 目标角色：{{#parse_vs2.target_roles_text#}}
+          - 任务对象：{{#parse_vs1.name#}}
 
-            可继续进入事件分级、响应动作编排和证据核验。
-      - id: answer-vs3
-        position:
-          x: 1200
-          y: 180
-        data:
-          desc: ''
-          title: VS3 Output
-          type: answer
-          variables: []
-          answer: |
-            已受理任务，首屏分流信息如下：
-            - 场景类型：{{#parse_vs3.scene_type#}}
-            - 严重度：{{#parse_vs3.severity#}}
-            - 优先级：{{#parse_vs3.priority#}}
-            - 待办状态：{{#parse_vs3.task_status#}}
-            - 映射链路：{{#parse_vs3.risk_object#}} -> {{#parse_vs3.primary_asset#}} -> {{#parse_vs3.deployment_scope#}} -> {{#parse_vs3.owner_team#}}
-            - 任务对象：{{#parse_vs3.name#}}
-            - 关键资产：{{#parse_vs3.primary_asset#}}
-            - 部署范围：{{#parse_vs3.deployment_scope#}}
-            - 责任团队：{{#parse_vs3.owner_team#}}
-            - 业务域：{{#parse_vs3.business_domain#}}
-            - 业务关键度：{{#parse_vs3.business_criticality#}}
-            - 当前窗口：{{#parse_vs3.execution_window#}}
-            - 业务影响：{{#parse_vs3.business_impact#}}
-            - 目标角色：{{#parse_vs3.target_roles_text#}}
+          - 关键资产：{{#parse_vs1.primary_asset#}}
 
-            可继续进入影响范围确认、窗口期建议和决策摘要生成。
-      - id: answer-vs4
-        position:
-          x: 1200
-          y: 260
-        data:
-          desc: ''
-          title: VS4 Output
-          type: answer
-          variables: []
-          answer: |
-            已受理任务，首屏分流信息如下：
-            - 场景类型：{{#parse_vs4.scene_type#}}
-            - 严重度：{{#parse_vs4.severity#}}
-            - 优先级：{{#parse_vs4.priority#}}
-            - 待办状态：{{#parse_vs4.task_status#}}
-            - 映射链路：{{#parse_vs4.risk_object#}} -> {{#parse_vs4.primary_asset#}} -> {{#parse_vs4.deployment_scope#}} -> {{#parse_vs4.owner_team#}}
-            - 任务对象：{{#parse_vs4.name#}}
-            - 关键资产：{{#parse_vs4.primary_asset#}}
-            - 部署范围：{{#parse_vs4.deployment_scope#}}
-            - 责任团队：{{#parse_vs4.owner_team#}}
-            - 业务域：{{#parse_vs4.business_domain#}}
-            - 业务关键度：{{#parse_vs4.business_criticality#}}
-            - 当前窗口：{{#parse_vs4.execution_window#}}
-            - 业务影响：{{#parse_vs4.business_impact#}}
-            - 目标角色：{{#parse_vs4.target_roles_text#}}
+          - 部署范围：{{#parse_vs1.deployment_scope#}}
 
-            可继续进入规则草案确认、上线动作和命中反馈校准。
-      - id: answer_router_fallback
-        position:
-          x: 1200
-          y: 360
-        data:
-          desc: ''
-          title: Router Fallback
-          type: answer
-          variables: []
-          answer: |
-            当前输入未命中预置场景分流规则，因此没有自动生成任务。
+          - 责任团队：{{#parse_vs1.owner_team#}}
 
-            请改用以下任一表达后重试：
-            - 威胁建模：包含“威胁建模”或“上线前”
-            - 运营响应：包含“响应”“告警”“横向移动”或“任务受理”
-            - 漏洞影响：包含“漏洞”或“企业影响”
-            - 环境监控：包含“监控”或“环境监控任务”
+          - 业务域：{{#parse_vs1.business_domain#}}
 
-            如需精确路由，也可以直接在入口选择 VS1、VS2、VS3 或 VS4。
-metadata:
-  architecture:
-    '# @ArchitectureID': '1214'
-  webhook:
-    path: /webhooks/opencti/threat-intelligence
-    auth_required: false
-  runtime_tools:
-    - DifyAgentWorkflow/tools/ai4sec_runtime_tools.py
+          - 业务关键度：{{#parse_vs1.business_criticality#}}
+
+          - 当前窗口：{{#parse_vs1.execution_window#}}
+
+          - 业务影响：{{#parse_vs1.business_impact#}}
+
+          - 目标角色：{{#parse_vs1.target_roles_text#}}
+
+
+          可继续进入发布判定、控制缺口复核和证据核验。
+
+          '
+        desc: ''
+        title: VS1 Output
+        type: answer
+        variables: []
+      height: 539
+      id: answer-vs1
+      position:
+        x: 1303
+        y: -124
+      positionAbsolute:
+        x: 1303
+        y: -124
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        answer: '已受理任务，首屏分流信息如下：
+
+          - 场景类型：{{#parse_vs2.scene_type#}}
+
+          - 严重度：{{#parse_vs2.severity#}}
+
+          - 优先级：{{#parse_vs2.priority#}}
+
+          - 待办状态：{{#parse_vs2.task_status#}}
+
+          - 任务对象：{{#parse_vs2.name#}}
+
+          - 关键资产：{{#parse_vs2.primary_asset#}}
+
+          - 部署范围：{{#parse_vs2.deployment_scope#}}
+
+          - 责任团队：{{#parse_vs2.owner_team#}}
+
+          - 业务域：{{#parse_vs2.business_domain#}}
+
+          - 业务关键度：{{#parse_vs2.business_criticality#}}
+
+          - 当前窗口：{{#parse_vs2.execution_window#}}
+
+          - 业务影响：{{#parse_vs2.business_impact#}}
+
+          - 目标角色：{{#parse_vs2.target_roles_text#}}
+
+
+          可继续进入事件分级、响应动作编排和证据核验。
+
+          '
+        desc: ''
+        title: VS2 Output
+        type: answer
+        variables: []
+      height: 539
+      id: answer-vs2
+      position:
+        x: 1234
+        y: 29
+      positionAbsolute:
+        x: 1234
+        y: 29
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        answer: '已受理任务，首屏分流信息如下：
+
+          - 场景类型：{{#parse_vs3.scene_type#}}
+
+          - 严重度：{{#parse_vs3.severity#}}
+
+          - 优先级：{{#parse_vs3.priority#}}
+
+          - 待办状态：{{#parse_vs3.task_status#}}
+
+          - 映射链路：{{#parse_vs3.risk_object#}} -> {{#parse_vs3.primary_asset#}} -> {{#parse_vs3.deployment_scope#}}
+          -> {{#parse_vs3.owner_team#}}
+
+          - 任务对象：{{#parse_vs3.name#}}
+
+          - 关键资产：{{#parse_vs3.primary_asset#}}
+
+          - 部署范围：{{#parse_vs3.deployment_scope#}}
+
+          - 责任团队：{{#parse_vs3.owner_team#}}
+
+          - 业务域：{{#parse_vs3.business_domain#}}
+
+          - 业务关键度：{{#parse_vs3.business_criticality#}}
+
+          - 当前窗口：{{#parse_vs3.execution_window#}}
+
+          - 业务影响：{{#parse_vs3.business_impact#}}
+
+          - 目标角色：{{#parse_vs3.target_roles_text#}}
+
+
+          可继续进入影响范围确认、窗口期建议和决策摘要生成。
+
+          '
+        desc: ''
+        title: VS3 Output
+        type: answer
+        variables: []
+      height: 631
+      id: answer-vs3
+      position:
+        x: 1274
+        y: 267
+      positionAbsolute:
+        x: 1274
+        y: 267
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        answer: '已受理任务，首屏分流信息如下：
+
+          - 场景类型：{{#parse_vs4.scene_type#}}
+
+          - 严重度：{{#parse_vs4.severity#}}
+
+          - 优先级：{{#parse_vs4.priority#}}
+
+          - 待办状态：{{#parse_vs4.task_status#}}
+
+          - 映射链路：{{#parse_vs4.risk_object#}} -> {{#parse_vs4.primary_asset#}} -> {{#parse_vs4.deployment_scope#}}
+          -> {{#parse_vs4.owner_team#}}
+
+          - 任务对象：{{#parse_vs4.name#}}
+
+          - 关键资产：{{#parse_vs4.primary_asset#}}
+
+          - 部署范围：{{#parse_vs4.deployment_scope#}}
+
+          - 责任团队：{{#parse_vs4.owner_team#}}
+
+          - 业务域：{{#parse_vs4.business_domain#}}
+
+          - 业务关键度：{{#parse_vs4.business_criticality#}}
+
+          - 当前窗口：{{#parse_vs4.execution_window#}}
+
+          - 业务影响：{{#parse_vs4.business_impact#}}
+
+          - 目标角色：{{#parse_vs4.target_roles_text#}}
+
+
+          可继续进入规则草案确认、上线动作和命中反馈校准。
+
+          '
+        desc: ''
+        title: VS4 Output
+        type: answer
+        variables: []
+      height: 631
+      id: answer-vs4
+      position:
+        x: 1119
+        y: 511
+      positionAbsolute:
+        x: 1119
+        y: 511
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        answer: '当前输入未命中预置场景分流规则，因此没有自动生成任务。
+
+
+          请改用以下任一表达后重试：
+
+          - 威胁建模：包含“威胁建模”或“上线前”
+
+          - 运营响应：包含“响应”“告警”“横向移动”或“任务受理”
+
+          - 漏洞影响：包含“漏洞”或“企业影响”
+
+          - 环境监控：包含“监控”或“环境监控任务”
+
+
+          如需精确路由，也可以直接在入口选择 VS1、VS2、VS3 或 VS4。
+
+          '
+        desc: ''
+        title: Router Fallback
+        type: answer
+        variables: []
+      height: 228
+      id: answer_router_fallback
+      position:
+        x: 760
+        y: 661
+      positionAbsolute:
+        x: 760
+        y: 661
+      selected: true
+      type: custom
+      width: 242
+    viewport:
+      x: -163
+      y: 174
+      zoom: 1
+  rag_pipeline_variables: []
