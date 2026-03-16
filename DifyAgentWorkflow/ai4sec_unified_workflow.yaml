@@ -295,6 +295,27 @@ workflow:
             variable_selector:
             - start-node
             - sys.query
+          - comparison_operator: contains
+            id: vs1-model-result
+            value: 建模结果
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs1-release-advice
+            value: 发布建议
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
+          - comparison_operator: contains
+            id: vs1-threat-conclusion
+            value: 威胁结论
+            varType: string
+            variable_selector:
+            - start-node
+            - sys.query
           logical_operator: or
         - case_id: vs2
           conditions:
@@ -1113,7 +1134,7 @@ workflow:
 
           请改用以下任一表达后重试：
 
-          - 威胁建模：包含“威胁建模”或“上线前”
+          - 威胁建模：包含“威胁建模”“上线前”“建模结果”“威胁结论”或“发布建议”
 
           - 运营响应：包含“响应”“告警”“横向移动”或“任务受理”
 
