@@ -13,6 +13,10 @@ class OpenCTIMCPSettings(BaseSettings):
     opencti_api_token: str = ""
     mock_mode: bool = False
     request_timeout_seconds: float = 15.0
+    vs1_object_id: str = ""
+    vs2_object_id: str = ""
+    vs3_object_id: str = ""
+    vs4_object_id: str = ""
 
     model_config = SettingsConfigDict(
         env_prefix="OPENCTI_MCP_",

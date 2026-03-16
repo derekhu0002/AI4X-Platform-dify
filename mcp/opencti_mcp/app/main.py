@@ -16,8 +16,7 @@ app = FastAPI(title="ai4sec_opencti_mcp", version="0.1.0")
 async def handle_contract_error(_: object, error: MCPContractError) -> JSONResponse:
     """// @ArchitectureID: 1215"""
     envelope = ErrorEnvelope(code=error.code, message=error.message)
-    status_code = 404 if error.code == "CTI-4041" else 400
-    return JSONResponse(status_code=status_code, content=envelope.model_dump())
+    return JSONResponse(status_code=error.status_code, content=envelope.model_dump())
 
 
 @app.get("/health")

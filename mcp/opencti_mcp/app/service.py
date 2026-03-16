@@ -78,6 +78,7 @@ class MCPContractError(Exception):
 
     code: str
     message: str
+    status_code: int = 400
 
 
 class OpenCTIProjectionService:
@@ -111,10 +112,11 @@ class OpenCTIProjectionService:
     async def _load_object(self, object_id: str, object_type: str | None) -> dict[str, Any]:
         """// @ArchitectureID: 1215"""
         if object_id == "missing":
-            raise MCPContractError("CTI-4041", f"STIX object {object_id} was not found.")
+            raise MCPContractError("CTI-4041", f"STIX object {object_id} was not found.", status_code=404)
         if self.settings.mock_mode:
             return self._mock_object(object_id, object_type)
-        return await self._fetch_opencti_object(object_id, object_type)
+        resolved_object_id = self._resolve_object_id(object_id)
+        return await self._fetch_opencti_object(resolved_object_id, object_id, object_type)
 
     def _resolve_projection_fields(self, request: QueryRequest, stix_object: dict[str, Any]) -> set[str]:
         """// @ArchitectureID: 1215"""
@@ -147,7 +149,12 @@ class OpenCTIProjectionService:
             projected["relationships"] = relationships[: request.page_size]
         return projected
 
-    async def _fetch_opencti_object(self, object_id: str, object_type: str | None) -> dict[str, Any]:
+    async def _fetch_opencti_object(
+        self,
+        lookup_object_id: str,
+        requested_object_id: str,
+        object_type: str | None,
+    ) -> dict[str, Any]:
         """// @ArchitectureID: 1215"""
         query = """
         query StixCoreObject($id: String!) {
@@ -157,9 +164,6 @@ class OpenCTIProjectionService:
             entity_type
             created_at
             updated_at
-            ... on BasicObject {
-              name
-            }
           }
         }
         """
@@ -167,25 +171,81 @@ class OpenCTIProjectionService:
         if self.settings.opencti_api_token:
             headers["Authorization"] = f"Bearer {self.settings.opencti_api_token}"
 
-        async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
-            response = await client.post(
-                self.settings.opencti_base_url,
-                json={"query": query, "variables": {"id": object_id}},
-                headers=headers,
+        try:
+            async with httpx.AsyncClient(
+                timeout=self.settings.request_timeout_seconds,
+                trust_env=False,
+            ) as client:
+                response = await client.post(
+                    self.settings.opencti_base_url,
+                    json={"query": query, "variables": {"id": lookup_object_id}},
+                    headers=headers,
+                )
+        except httpx.TimeoutException as error:
+            raise MCPContractError(
+                "CTI-5041",
+                "OpenCTI GraphQL request timed out. Check whether OpenCTI is ready and reachable.",
+                status_code=504,
+            ) from error
+        except httpx.RequestError as error:
+            raise MCPContractError(
+                "CTI-5031",
+                f"OpenCTI GraphQL is unreachable at {self.settings.opencti_base_url}.",
+                status_code=503,
+            ) from error
+
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as error:
+            status_code = error.response.status_code
+            if status_code >= 500:
+                raise MCPContractError(
+                    "CTI-5021",
+                    f"OpenCTI GraphQL returned {status_code}. Check whether the OpenCTI platform is fully started.",
+                    status_code=502,
+                ) from error
+            raise MCPContractError(
+                "CTI-4004",
+                f"OpenCTI GraphQL returned {status_code}. Check the endpoint URL and API token configuration.",
+                status_code=502,
+            ) from error
+
+        try:
+            payload = response.json()
+        except ValueError as error:
+            raise MCPContractError(
+                "CTI-5022",
+                "OpenCTI GraphQL returned a non-JSON response.",
+                status_code=502,
+            ) from error
+
+        graphql_errors = payload.get("errors") or []
+        if graphql_errors:
+            first_error = graphql_errors[0]
+            error_message = first_error.get("message") if isinstance(first_error, dict) else str(first_error)
+            raise MCPContractError(
+                "CTI-5023",
+                f"OpenCTI GraphQL returned an application error: {error_message}",
+                status_code=502,
             )
-        response.raise_for_status()
-        payload = response.json()
+
         data = payload.get("data", {}).get("stixCoreObject")
         if not data:
-            raise MCPContractError("CTI-4041", f"STIX object {object_id} was not found.")
+            raise MCPContractError(
+                "CTI-4041",
+                f"STIX object {requested_object_id} was not found.",
+                status_code=404,
+            )
 
-        context = self._context_for_object(data.get("entity_type", object_type), object_id)
+        semantic_type = object_type or requested_object_id.split("--", 1)[0]
+        severity = self._severity_for_object(semantic_type, requested_object_id)
+        context = self._context_for_object(semantic_type, requested_object_id)
 
         return {
             "id": data["id"],
             "type": object_type or data.get("entity_type", "stix-core-object"),
             "standard_id": data.get("standard_id", data["id"]),
-            "name": str(context.get("name") or data.get("name", object_id)),
+            "name": str(context.get("name") or data.get("name", requested_object_id)),
             "modified": data.get("updated_at", data.get("created_at", "")),
             "description": "Resolved from OpenCTI GraphQL.",
             "labels": [],
@@ -193,14 +253,14 @@ class OpenCTIProjectionService:
             "external_references": [],
             "object_marking_refs": [],
             "extensions": {},
-            "risk_object": str(context.get("risk_object") or data.get("name", object_id)),
-            "scene_type": self._scene_type_for_object(data.get("entity_type", object_type), object_id),
-            "severity": "high",
-            "priority": self._priority_for_severity("high"),
+            "risk_object": str(context.get("risk_object") or data.get("name", requested_object_id)),
+            "scene_type": self._scene_type_for_object(semantic_type, requested_object_id),
+            "severity": severity,
+            "priority": self._priority_for_severity(severity),
             "task_status": "待处理",
             "business_impact": str(context.get("business_impact") or "Pending analyst review."),
             "target_roles": list(context.get("target_roles") or ["情报分析师"]),
-            "primary_asset": str(context.get("primary_asset") or data.get("name", object_id)),
+            "primary_asset": str(context.get("primary_asset") or data.get("name", requested_object_id)),
             "deployment_scope": str(context.get("deployment_scope") or "待补充部署范围"),
             "owner_team": str(context.get("owner_team") or "待分配团队"),
             "business_domain": str(context.get("business_domain") or "待补充业务域"),
@@ -208,6 +268,17 @@ class OpenCTIProjectionService:
             "execution_window": str(context.get("execution_window") or "待确认"),
             "relationships": [],
         }
+
+    def _resolve_object_id(self, object_id: str) -> str:
+        """// @ArchitectureID: 1215"""
+        configured_aliases = {
+            "attack-pattern--vs1": self.settings.vs1_object_id,
+            "incident--vs2": self.settings.vs2_object_id,
+            "grouping--vs2": self.settings.vs2_object_id,
+            "vulnerability--vs3": self.settings.vs3_object_id,
+            "indicator--vs4": self.settings.vs4_object_id,
+        }
+        return configured_aliases.get(object_id) or object_id
 
     def _mock_object(self, object_id: str, object_type: str | None) -> dict[str, Any]:
         """// @ArchitectureID: 1215"""
