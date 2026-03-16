@@ -2,6 +2,7 @@
 .github
 .obsidian
 .env
-mcp/__pycache__/__init__.cpython-313.pyc
-mcp/opencti_mcp/app/__pycache__/main.cpython-313.pyc
-mcp/opencti_mcp/app/__pycache__/main.cpython-313.pyc
+
+# Python cache directories and bytecode
+__pycache__/
+*.py[cod]
