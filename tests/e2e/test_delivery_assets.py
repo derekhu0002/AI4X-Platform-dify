@@ -19,3 +19,15 @@ def test_python_tool_asset_exists() -> None:
     content = tool_path.read_text(encoding="utf-8")
     assert "resolve_opencti_signal" in content
     assert "route_entrypoint" in content
+
+
+def test_dedicated_webhook_workflow_asset_exists() -> None:
+    workflow_path = Path("DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml")
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    assert workflow["kind"] == "app"
+    assert workflow["app"]["mode"] == "workflow"
+    nodes = {node["id"]: node for node in workflow["workflow"]["graph"]["nodes"]}
+    assert "webhook-trigger" in nodes
+    assert nodes["webhook-trigger"]["data"]["type"] == "trigger-webhook"
+    trigger_variables = {item["variable"] for item in nodes["webhook-trigger"]["data"]["variables"]}
+    assert "_webhook_raw" in trigger_variables

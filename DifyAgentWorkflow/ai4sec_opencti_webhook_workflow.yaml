@@ -1,0 +1,283 @@
+app:
+  description: Dedicated webhook-only workflow for OpenCTI signal bundle ingress.
+  icon: W
+  icon_background: '#E9F2FF'
+  mode: workflow
+  name: AI4SEC OpenCTI Webhook Workflow
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - description: ''
+    id: webhook-opencti-url
+    name: OPENCTI_MCP_URL
+    selector:
+    - env
+    - OPENCTI_MCP_URL
+    value: http://host.docker.internal:8101
+    value_type: string
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: trigger-webhook
+        targetType: code
+      id: edge-trigger-normalize
+      source: webhook-trigger
+      sourceHandle: source
+      target: normalize-webhook
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: http-request
+      id: edge-normalize-query
+      source: normalize-webhook
+      sourceHandle: source
+      target: query-opencti
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: edge-query-build-answer
+      source: query-opencti
+      sourceHandle: source
+      target: build-response
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: answer
+      id: edge-build-answer
+      source: build-response
+      sourceHandle: source
+      target: answer-webhook
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        async_mode: true
+        body: []
+        content_type: application/json
+        desc: ''
+        headers: []
+        method: POST
+        params: []
+        response_body: ''
+        selected: false
+        status_code: 200
+        title: Webhook 触发器
+        type: trigger-webhook
+        variables:
+        - label: raw
+          required: true
+          value_selector: []
+          value_type: object
+          variable: _webhook_raw
+        webhook_debug_url: ''
+        webhook_url: ''
+      height: 130
+      id: webhook-trigger
+      position:
+        x: 30
+        y: 120
+      positionAbsolute:
+        x: 30
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef _coerce_bundle(raw_payload: object) -> tuple[dict, str, str, str]:\n    payload = raw_payload if isinstance(raw_payload, dict) else {}\n    entry_mode = str(payload.get('entry_mode') or 'webhook').strip() or 'webhook'\n    selected_flow = str(payload.get('selected_flow') or '').strip()\n    user_request = str(payload.get('user_request') or '').strip()\n\n    bundle_candidate = payload.get('webhook_bundle', payload)\n    if isinstance(bundle_candidate, str):\n        bundle = json.loads(bundle_candidate)\n    elif isinstance(bundle_candidate, dict):\n        bundle = bundle_candidate\n    else:\n        raise ValueError('Webhook payload must contain a STIX bundle object or webhook_bundle field.')\n\n    return bundle, entry_mode, selected_flow, user_request\n\n\ndef main(raw_payload: object) -> dict:\n    # @ArchitectureID: 1214\n    bundle, entry_mode, selected_flow, user_request = _coerce_bundle(raw_payload)\n    objects = bundle.get('objects') or []\n    if not objects:\n        raise ValueError('Webhook bundle must contain at least one STIX object.')\n\n    signal = objects[0]\n    lookup_id = str(signal.get('x_opencti_id') or signal.get('id') or '').strip()\n    if not lookup_id:\n        raise ValueError('Webhook signal does not contain lookup id.')\n\n    object_type = str(signal.get('type') or 'vulnerability').strip()\n    derived_flow = selected_flow or ('VS3' if entry_mode == 'webhook' else 'VS4')\n    if object_type == 'attack-pattern':\n        derived_flow = selected_flow or 'VS1'\n    elif object_type in {'incident', 'grouping'}:\n        derived_flow = selected_flow or 'VS2'\n    elif object_type == 'indicator':\n        derived_flow = selected_flow or 'VS4'\n\n    return {\n        'lookup_id': lookup_id,\n        'object_type': object_type,\n        'selected_flow': derived_flow,\n        'bundle_id': str(bundle.get('id') or ''),\n        'user_request': user_request or '来自 OpenCTI webhook 的 STIX 信号',\n    }\n"
+        code_language: python3
+        desc: ''
+        outputs:
+          bundle_id:
+            children: null
+            type: string
+          lookup_id:
+            children: null
+            type: string
+          object_type:
+            children: null
+            type: string
+          selected_flow:
+            children: null
+            type: string
+          user_request:
+            children: null
+            type: string
+        selected: false
+        title: Normalize Webhook Bundle
+        type: code
+        variables:
+        - value_selector:
+          - webhook-trigger
+          - _webhook_raw
+          variable: raw_payload
+      height: 54
+      id: normalize-webhook
+      position:
+        x: 324
+        y: 120
+      positionAbsolute:
+        x: 324
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - type: text
+            value: '{"object_id":"{{#normalize-webhook.lookup_id#}}","object_type":"{{#normalize-webhook.object_type#}}","projection_profile":"notification","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":false}'
+          type: json
+        desc: ''
+        headers: ''
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          connect: 10
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+          read: 600
+          write: 600
+        title: Query OpenCTI MCP
+        type: http-request
+        url: '{{#env.OPENCTI_MCP_URL#}}/query'
+        variables: []
+      height: 142
+      id: query-opencti
+      position:
+        x: 626
+        y: 120
+      positionAbsolute:
+        x: 626
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(response_json: str, selected_flow: str, lookup_id: str, bundle_id: str) -> dict:\n    # @ArchitectureID: 1214\n    payload = json.loads(response_json)\n    item = (payload.get('items') or [{}])[0]\n    return {\n        'scene_type': str(item.get('scene_type') or selected_flow),\n        'severity': str(item.get('severity') or 'unknown'),\n        'task_status': str(item.get('task_status') or '待处理'),\n        'name': str(item.get('name') or lookup_id),\n        'lookup_id': lookup_id,\n        'bundle_id': bundle_id or 'unknown-bundle',\n    }\n"
+        code_language: python3
+        desc: ''
+        outputs:
+          bundle_id:
+            children: null
+            type: string
+          lookup_id:
+            children: null
+            type: string
+          name:
+            children: null
+            type: string
+          scene_type:
+            children: null
+            type: string
+          severity:
+            children: null
+            type: string
+          task_status:
+            children: null
+            type: string
+        selected: false
+        title: Build Webhook Response
+        type: code
+        variables:
+        - value_selector:
+          - query-opencti
+          - body
+          variable: response_json
+        - value_selector:
+          - normalize-webhook
+          - selected_flow
+          variable: selected_flow
+        - value_selector:
+          - normalize-webhook
+          - lookup_id
+          variable: lookup_id
+        - value_selector:
+          - normalize-webhook
+          - bundle_id
+          variable: bundle_id
+      height: 54
+      id: build-response
+      position:
+        x: 930
+        y: 120
+      positionAbsolute:
+        x: 930
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: 'Webhook 已受理。\n\n- Bundle ID：{{#build-response.bundle_id#}}\n- Lookup ID：{{#build-response.lookup_id#}}\n- 场景：{{#build-response.scene_type#}}\n- 对象：{{#build-response.name#}}\n- 严重度：{{#build-response.severity#}}\n- 当前状态：{{#build-response.task_status#}}\n'
+        desc: ''
+        selected: false
+        title: Webhook Output
+        type: answer
+        variables: []
+      height: 220
+      id: answer-webhook
+      position:
+        x: 1235
+        y: 70
+      positionAbsolute:
+        x: 1235
+        y: 70
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 24
+      y: 38
+      zoom: 0.9
+  rag_pipeline_variables: []
