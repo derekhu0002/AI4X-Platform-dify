@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+import json
+from pathlib import Path
+import time
 from typing import Any
 
 import httpx
@@ -71,6 +75,17 @@ PROJECTION_FIELDS: dict[str, set[str]] = {
     },
 }
 
+DEFAULT_MINIMAL_STIX_FIELDS: dict[str, set[str]] = {
+    "indicator": {"id", "type", "pattern", "pattern_type", "valid_from"},
+    "vulnerability": {"id", "type", "name"},
+    "incident": {"id", "type", "name"},
+    "attack-pattern": {"id", "type", "name"},
+    "grouping": {"id", "type", "name", "object_refs"},
+    "note": {"id", "type", "content", "object_refs"},
+    "opinion": {"id", "type", "opinion", "object_refs"},
+    "relationship": {"id", "type", "relationship_type", "source_ref", "target_ref"},
+}
+
 
 @dataclass
 class MCPContractError(Exception):
@@ -87,6 +102,7 @@ class OpenCTIProjectionService:
     def __init__(self, settings: OpenCTIMCPSettings):
         """// @ArchitectureID: 1215"""
         self.settings = settings
+        self.minimal_stix_fields = self._load_minimal_field_matrix()
 
     async def query(self, request: QueryRequest) -> QueryResponse:
         """// @ArchitectureID: 1215"""
@@ -102,12 +118,102 @@ class OpenCTIProjectionService:
         if bundle.get("type") != "bundle":
             raise MCPContractError("MCP-4003", "Only STIX bundle payloads are accepted.")
 
-        object_ids = [obj.get("id", "unknown") for obj in bundle.get("objects", [])]
+        objects = bundle.get("objects", [])
+        if not objects:
+            raise MCPContractError("MCP-4003", "STIX bundle must contain at least one object.")
+
+        self._validate_bundle_minimal_fields(objects)
+
+        object_ids = [str(obj.get("id", "unknown")) for obj in objects]
         if request.dry_run:
             return BundleWriteResponse(accepted=True, persisted_object_ids=object_ids, mode="dry-run")
         if self.settings.mock_mode:
             return BundleWriteResponse(accepted=True, persisted_object_ids=object_ids, mode="mock")
+
+        await self._write_bundle_to_opencti(bundle)
+        await self._verify_persisted_objects(object_ids)
         return BundleWriteResponse(accepted=True, persisted_object_ids=object_ids, mode="opencti")
+
+    def _load_minimal_field_matrix(self) -> dict[str, set[str]]:
+        """// @ArchitectureID: 1215"""
+        config_path = Path(self.settings.stix_minimal_field_matrix_path)
+        if not config_path.is_absolute():
+            config_path = Path(__file__).resolve().parents[3] / config_path
+
+        if not config_path.exists():
+            return DEFAULT_MINIMAL_STIX_FIELDS
+
+        try:
+            payload = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise MCPContractError(
+                "MCP-4005",
+                f"Unable to load STIX minimal field matrix from {config_path}.",
+                status_code=500,
+            ) from error
+
+        matrix = payload.get("matrix", {}) if isinstance(payload, dict) else {}
+        normalized: dict[str, set[str]] = {}
+        for object_type, fields in matrix.items():
+            if isinstance(object_type, str) and isinstance(fields, list):
+                normalized[object_type.lower()] = {str(field) for field in fields}
+
+        return normalized or DEFAULT_MINIMAL_STIX_FIELDS
+
+    def _validate_bundle_minimal_fields(self, objects: list[dict[str, Any]]) -> None:
+        """// @ArchitectureID: 1215"""
+        for stix_object in objects:
+            object_type = str(stix_object.get("type", "")).lower()
+            object_id = str(stix_object.get("id", "unknown"))
+            required_fields = self.minimal_stix_fields.get(object_type)
+            if not required_fields:
+                continue
+
+            missing = sorted(field for field in required_fields if stix_object.get(field) in (None, "", []))
+            if missing:
+                raise MCPContractError(
+                    "MCP-4006",
+                    f"STIX object {object_id} is missing required fields: {', '.join(missing)}",
+                )
+
+    async def _write_bundle_to_opencti(self, bundle: dict[str, Any]) -> None:
+        """// @ArchitectureID: 1215"""
+        mutation = """
+        mutation ImportPush($bundle: String!, $update: Boolean!) {
+          importPush(type: "text/json", file: $bundle, update: $update)
+        }
+        """
+        await self._post_graphql(
+            query=mutation,
+            variables={"bundle": json.dumps(bundle, ensure_ascii=False), "update": True},
+            operation_name="importPush",
+        )
+
+    async def _verify_persisted_objects(self, object_ids: list[str]) -> None:
+        """// @ArchitectureID: 1215"""
+        deadline = time.monotonic() + max(self.settings.writeback_verify_window_seconds, 0.1)
+        unresolved = set(object_ids)
+
+        while unresolved and time.monotonic() <= deadline:
+            current = list(unresolved)
+            for object_id in current:
+                try:
+                    await self._fetch_opencti_object(object_id, object_id, None)
+                    unresolved.discard(object_id)
+                except MCPContractError as error:
+                    if error.code != "CTI-4041":
+                        raise
+
+            if unresolved and time.monotonic() <= deadline:
+                await asyncio.sleep(0.1)
+
+        if unresolved:
+            missing = ", ".join(sorted(unresolved))
+            raise MCPContractError(
+                "CTI-4091",
+                f"Writeback verification failed within {self.settings.writeback_verify_window_seconds:.1f}s for: {missing}",
+                status_code=409,
+            )
 
     async def _load_object(self, object_id: str, object_type: str | None) -> dict[str, Any]:
         """// @ArchitectureID: 1215"""
@@ -167,10 +273,61 @@ class OpenCTIProjectionService:
           }
         }
         """
+        payload = await self._post_graphql(
+            query=query,
+            variables={"id": lookup_object_id},
+            operation_name="stixCoreObject",
+        )
+
+        data = payload.get("data", {}).get("stixCoreObject")
+        if not data:
+            raise MCPContractError(
+                "CTI-4041",
+                f"STIX object {requested_object_id} was not found.",
+                status_code=404,
+            )
+
+        semantic_type = object_type or requested_object_id.split("--", 1)[0]
+        severity = self._severity_for_object(semantic_type, requested_object_id)
+        context = self._context_for_object(semantic_type, requested_object_id)
+
+        return {
+            "id": data["id"],
+            "type": object_type or data.get("entity_type", "stix-core-object"),
+            "standard_id": data.get("standard_id", data["id"]),
+            "name": str(context.get("name") or data.get("name", requested_object_id)),
+            "modified": data.get("updated_at", data.get("created_at", "")),
+            "description": "Resolved from OpenCTI GraphQL.",
+            "labels": [],
+            "confidence": 50,
+            "external_references": [],
+            "object_marking_refs": [],
+            "extensions": {},
+            "risk_object": str(context.get("risk_object") or data.get("name", requested_object_id)),
+            "scene_type": self._scene_type_for_object(semantic_type, requested_object_id),
+            "severity": severity,
+            "priority": self._priority_for_severity(severity),
+            "task_status": "待处理",
+            "business_impact": str(context.get("business_impact") or "Pending analyst review."),
+            "target_roles": list(context.get("target_roles") or ["情报分析师"]),
+            "primary_asset": str(context.get("primary_asset") or data.get("name", requested_object_id)),
+            "deployment_scope": str(context.get("deployment_scope") or "待补充部署范围"),
+            "owner_team": str(context.get("owner_team") or "待分配团队"),
+            "business_domain": str(context.get("business_domain") or "待补充业务域"),
+            "business_criticality": str(context.get("business_criticality") or "待评估"),
+            "execution_window": str(context.get("execution_window") or "待确认"),
+            "relationships": [],
+        }
+
+    def _graphql_headers(self) -> dict[str, str]:
+        """// @ArchitectureID: 1215"""
         headers = {"Content-Type": "application/json"}
         if self.settings.opencti_api_token:
             headers["Authorization"] = f"Bearer {self.settings.opencti_api_token}"
+        return headers
 
+    async def _post_graphql(self, query: str, variables: dict[str, Any], operation_name: str) -> dict[str, Any]:
+        """// @ArchitectureID: 1215"""
         try:
             async with httpx.AsyncClient(
                 timeout=self.settings.request_timeout_seconds,
@@ -178,8 +335,8 @@ class OpenCTIProjectionService:
             ) as client:
                 response = await client.post(
                     self.settings.opencti_base_url,
-                    json={"query": query, "variables": {"id": lookup_object_id}},
-                    headers=headers,
+                    json={"query": query, "variables": variables},
+                    headers=self._graphql_headers(),
                 )
         except httpx.TimeoutException as error:
             raise MCPContractError(
@@ -225,49 +382,11 @@ class OpenCTIProjectionService:
             error_message = first_error.get("message") if isinstance(first_error, dict) else str(first_error)
             raise MCPContractError(
                 "CTI-5023",
-                f"OpenCTI GraphQL returned an application error: {error_message}",
+                f"OpenCTI GraphQL returned an application error in {operation_name}: {error_message}",
                 status_code=502,
             )
 
-        data = payload.get("data", {}).get("stixCoreObject")
-        if not data:
-            raise MCPContractError(
-                "CTI-4041",
-                f"STIX object {requested_object_id} was not found.",
-                status_code=404,
-            )
-
-        semantic_type = object_type or requested_object_id.split("--", 1)[0]
-        severity = self._severity_for_object(semantic_type, requested_object_id)
-        context = self._context_for_object(semantic_type, requested_object_id)
-
-        return {
-            "id": data["id"],
-            "type": object_type or data.get("entity_type", "stix-core-object"),
-            "standard_id": data.get("standard_id", data["id"]),
-            "name": str(context.get("name") or data.get("name", requested_object_id)),
-            "modified": data.get("updated_at", data.get("created_at", "")),
-            "description": "Resolved from OpenCTI GraphQL.",
-            "labels": [],
-            "confidence": 50,
-            "external_references": [],
-            "object_marking_refs": [],
-            "extensions": {},
-            "risk_object": str(context.get("risk_object") or data.get("name", requested_object_id)),
-            "scene_type": self._scene_type_for_object(semantic_type, requested_object_id),
-            "severity": severity,
-            "priority": self._priority_for_severity(severity),
-            "task_status": "待处理",
-            "business_impact": str(context.get("business_impact") or "Pending analyst review."),
-            "target_roles": list(context.get("target_roles") or ["情报分析师"]),
-            "primary_asset": str(context.get("primary_asset") or data.get("name", requested_object_id)),
-            "deployment_scope": str(context.get("deployment_scope") or "待补充部署范围"),
-            "owner_team": str(context.get("owner_team") or "待分配团队"),
-            "business_domain": str(context.get("business_domain") or "待补充业务域"),
-            "business_criticality": str(context.get("business_criticality") or "待评估"),
-            "execution_window": str(context.get("execution_window") or "待确认"),
-            "relationships": [],
-        }
+        return payload
 
     def _resolve_object_id(self, object_id: str) -> str:
         """// @ArchitectureID: 1215"""

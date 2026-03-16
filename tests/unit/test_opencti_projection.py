@@ -253,6 +253,66 @@ def test_query_disables_environment_proxy_in_httpx_client() -> None:
     assert DummyAsyncClient.captured_init_kwargs["trust_env"] is False
 
 
+def test_write_bundle_rejects_missing_minimal_fields() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=True)
+    service = OpenCTIProjectionService(settings)
+
+    from mcp.opencti_mcp.app import models as model_module
+    from mcp.opencti_mcp.app import service as service_module
+
+    request = model_module.BundleWriteRequest(
+        bundle={
+            "type": "bundle",
+            "objects": [
+                {
+                    "id": "indicator--vs4",
+                    "type": "indicator",
+                    "pattern_type": "stix",
+                    "valid_from": "2026-03-16T00:00:00Z",
+                }
+            ],
+        },
+        dry_run=True,
+    )
+
+    with pytest.raises(service_module.MCPContractError) as error:
+        asyncio.run(service.write_bundle(request))
+
+    assert error.value.code == "MCP-4006"
+    assert "pattern" in error.value.message
+
+
+def test_write_bundle_accepts_minimal_fields_in_dry_run() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=True)
+    service = OpenCTIProjectionService(settings)
+
+    from mcp.opencti_mcp.app.models import BundleWriteRequest
+
+    request = BundleWriteRequest(
+        bundle={
+            "type": "bundle",
+            "objects": [
+                {
+                    "id": "indicator--vs4",
+                    "type": "indicator",
+                    "pattern": "[ipv4-addr:value = '10.0.0.1']",
+                    "pattern_type": "stix",
+                    "valid_from": "2026-03-16T00:00:00Z",
+                }
+            ],
+        },
+        dry_run=True,
+    )
+
+    response = asyncio.run(service.write_bundle(request))
+    assert response.accepted is True
+    assert response.mode == "dry-run"
+
+
 def test_query_uses_incident_vs2_alias_for_live_opencti_lookup_and_context() -> None:
     import asyncio
 

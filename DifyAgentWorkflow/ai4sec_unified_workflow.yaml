@@ -9,6 +9,10 @@ app:
 dependencies: []
 kind: app
 version: 0.6.0
+metadata:
+  webhook:
+    auth_required: false
+    entry_mode: dify-native-workflow
 workflow:
   conversation_variables:
   - description: ''

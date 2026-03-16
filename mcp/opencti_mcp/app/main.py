@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 from mcp.opencti_mcp.app.models import BundleWriteRequest, ErrorEnvelope, QueryRequest
@@ -35,11 +35,3 @@ async def query_stix(request: QueryRequest) -> dict[str, object]:
 async def write_bundle(request: BundleWriteRequest) -> dict[str, object]:
     """// @ArchitectureID: 1215"""
     return (await service.write_bundle(request)).model_dump()
-
-
-@app.post("/webhooks/opencti/threat-intelligence")
-async def passthrough_webhook(payload: dict[str, object]) -> dict[str, object]:
-    """// @ArchitectureID: 1215"""
-    if "objects" not in payload:
-        raise HTTPException(status_code=400, detail="VAL-4001: payload.objects is required")
-    return {"accepted": True, "auth_required": False, "payload": payload}
