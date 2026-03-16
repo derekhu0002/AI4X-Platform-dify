@@ -1,0 +1,1 @@
+"""OpenCTI MCP application package."""

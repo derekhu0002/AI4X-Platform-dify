@@ -1,0 +1,1 @@
+"""Notification MCP application package."""
