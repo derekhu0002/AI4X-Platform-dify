@@ -1,7 +1,7 @@
 app:
   description: Standalone VS1 threat-modeling workflow that resolves a report from OpenCTI,
-    filters STIX 2.1 evidence, builds a structured TARA+STRIDE JSON result, and
-    exposes a session download link.
+    filters STIX 2.1 evidence, invokes a real LLM with the ArchitectureID 1437 schema,
+    and exposes the final JSON result in-session with a download link.
   icon: 🧭
   icon_background: '#EAF2FF'
   mode: advanced-chat
@@ -9,7 +9,7 @@ app:
   use_icon_as_answer_icon: false
 dependencies: []
 kind: app
-version: 0.1.0
+version: 0.2.0
 metadata:
   webhook:
     auth_required: false
@@ -28,7 +28,7 @@ workflow:
   features:
     file_upload:
       enabled: false
-    opening_statement: 请输入报告名称或报告 ID，我将按“精确匹配优先、失败后双模糊匹配”完成威胁建模，并提供 JSON 下载链接。
+    opening_statement: 请输入报告名称或报告 ID，我会优先做精确匹配，回查真实 OpenCTI 数据，并执行一次真实 LLM 威胁建模分析。
     retriever_resource:
       enabled: false
     sensitive_word_avoidance:
@@ -37,7 +37,8 @@ workflow:
       enabled: false
     suggested_questions:
     - 用报告名称 vs1-payment-threat-model 发起一次威胁建模
-    - 用报告 ID report--4eb41da2-0018-4ee9-bd5d-fc8fe82cad11 分析并下载 JSON
+    - 用报告名称 vs4-bola-monitoring-rule 分析并下载 JSON
+    - 用报告 ID report--cdd45eb6-f1cd-4f17-82b3-ac4bc03fcd58 发起一次威胁建模
     suggested_questions_after_answer:
       enabled: false
     text_to_speech:
@@ -48,40 +49,59 @@ workflow:
     edges:
     - data:
         sourceType: start
-        targetType: http-request
-      id: edge-start-query-threat-model-report
+        targetType: code
+      id: edge-start-resolve_report_ref
       source: start_node
       sourceHandle: source
-      target: query-threat-model-report
+      target: resolve_report_ref
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: http-request
+      id: edge-resolve-query_threat_model_report
+      source: resolve_report_ref
+      sourceHandle: source
+      target: query_threat_model_report
       targetHandle: target
       type: custom
     - data:
         sourceType: http-request
-        targetType: code
-      id: edge-query-build-threat-model
-      source: query-threat-model-report
+        targetType: llm
+      id: edge-query-llm_threat_model
+      source: query_threat_model_report
       sourceHandle: source
-      target: build-threat-model
+      target: llm_threat_model
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: code
+      id: edge-llm-format_threat_model
+      source: llm_threat_model
+      sourceHandle: source
+      target: format_threat_model
       targetHandle: target
       type: custom
     - data:
         sourceType: code
         targetType: answer
-      id: edge-build-threat-model-answer
-      source: build-threat-model
+      id: edge-format-answer_threat_model
+      source: format_threat_model
       sourceHandle: source
-      target: answer-threat-model
+      target: answer_threat_model
       targetHandle: target
       type: custom
     nodes:
     - data:
         desc: ''
+        selected: false
         title: Threat Modeling Input
         type: start
         variables:
         - label: report_ref
           max_length: 256
-          required: true
+          required: false
           type: text-input
           variable: report_ref
         - label: analysis_focus
@@ -93,10 +113,53 @@ workflow:
       id: start_node
       position:
         x: 30
-        y: 120
+        y: 140
       positionAbsolute:
         x: 30
-        y: 120
+        y: 140
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: |
+          def main(report_ref: str | None = None, sys_query: str | None = None) -> dict:
+              # // @ArchitectureID: 1436
+              explicit_ref = str(report_ref or "").strip()
+              query_ref = str(sys_query or "").strip()
+              effective_ref = explicit_ref or query_ref
+              if not effective_ref:
+                  raise ValueError("请直接输入报告名称或报告 ID。")
+              return {"report_ref": effective_ref}
+        code_language: python3
+        desc: ''
+        selected: false
+        outputs:
+          report_ref:
+            children: null
+            type: string
+        title: Resolve Report Reference
+        type: code
+        variables:
+        - value_selector:
+          - start_node
+          - report_ref
+          variable: report_ref
+        - value_selector:
+          - start_node
+          - sys
+          - query
+          variable: sys_query
+      height: 52
+      id: resolve_report_ref
+      position:
+        x: 330
+        y: 140
+      positionAbsolute:
+        x: 330
+        y: 140
+      sourcePosition: right
+      targetPosition: left
       type: custom
       width: 242
     - data:
@@ -106,7 +169,7 @@ workflow:
         body:
           data:
           - type: text
-            value: '{"report_ref":"{{#start_node.report_ref#}}"}'
+            value: '{"report_ref":"{{#resolve_report_ref.report_ref#}}"}'
           type: json
         desc: ''
         headers: ''
@@ -128,20 +191,355 @@ workflow:
         type: http-request
         url: '{{#env.OPENCTI_MCP_URL#}}/query/threat-model-report'
         variables: []
+        selected: false
       height: 142
-      id: query-threat-model-report
+      id: query_threat_model_report
       position:
-        x: 340
-        y: 108
+        x: 630
+        y: 122
       positionAbsolute:
-        x: 340
-        y: 108
+        x: 630
+        y: 122
+      sourcePosition: right
+      targetPosition: left
       type: custom
       width: 242
     - data:
-        code: "import json\nimport urllib.parse\n\ndef _pick_asset_names(objects: list[dict]) -> list[str]:\n    return [str(obj.get(\"name\")) for obj in objects if obj.get(\"type\") in {\"software\", \"infrastructure\", \"identity\"} and obj.get(\"name\")]\n\ndef _build_attack_patterns(objects: list[dict]) -> list[dict]:\n    return [\n        {\n            \"id\": str(obj.get(\"id\")),\n            \"name\": str(obj.get(\"name\") or \"Unknown attack pattern\"),\n            \"description\": str(obj.get(\"description\") or \"Threat pattern derived from OpenCTI report evidence.\"),\n            \"category\": \"application abuse\",\n            \"risk_level\": \"high\",\n            \"likelihood\": \"medium\",\n            \"impact\": \"high\",\n            \"stride\": \"Spoofing/Tampering\",\n            \"kill_chain_phases\": list(obj.get(\"kill_chain_phases\") or []),\n        }\n        for obj in objects\n        if obj.get(\"type\") == \"attack-pattern\"\n    ]\n\ndef _build_course_of_actions(objects: list[dict], attack_patterns: list[dict]) -> list[dict]:\n    mitigates_ids = [pattern.get(\"id\") for pattern in attack_patterns if pattern.get(\"id\")]\n    return [\n        {\n            \"id\": str(obj.get(\"id\")),\n            \"type\": \"course-of-action\",\n            \"name\": str(obj.get(\"name\") or \"Recommended mitigation\"),\n            \"description\": str(obj.get(\"description\") or \"Mitigation derived from OpenCTI control evidence.\"),\n            \"mitigates_attack_pattern_ids\": mitigates_ids,\n        }\n        for obj in objects\n        if obj.get(\"type\") == \"course-of-action\"\n    ]\n\ndef main(response_json: str, analysis_focus: str | None = None) -> dict:\n    # // @ArchitectureID: 1436\n    payload = json.loads(response_json)\n    matched_report = payload.get(\"matched_report\") or {}\n    bundle = payload.get(\"bundle\") or {\"objects\": []}\n    objects = list(bundle.get(\"objects\") or [])\n    report_name = str(matched_report.get(\"report_name\") or \"Unnamed report\")\n    asset_names = _pick_asset_names(objects)\n    attack_patterns = _build_attack_patterns(objects)\n    course_of_actions = _build_course_of_actions(objects, attack_patterns)\n    focus_text = str(analysis_focus or \"\").strip()\n\n    targets = []\n    if attack_patterns:\n        for index, attack_pattern in enumerate(attack_patterns):\n            asset_name = asset_names[index] if index < len(asset_names) else (asset_names[0] if asset_names else report_name)\n            targets.append(\n                {\n                    \"attack_pattern_id\": attack_pattern.get(\"id\"),\n                    \"asset_name\": asset_name,\n                    \"intrinsic_value\": \"high\",\n                    \"intrinsic_value_dimensions\": [\"confidentiality\", \"integrity\", \"availability\"],\n                    \"intrinsic_value_reason\": f\"{asset_name} is directly referenced by report evidence and release-gate context.\",\n                }\n            )\n\n    report_refs = [str(obj.get(\"id\")) for obj in objects if obj.get(\"id\")]\n    simulated_attack_paths = [\n        {\n            \"id\": f\"report-path--{report_name.lower().replace(' ', '-')}\",\n            \"type\": \"report\",\n            \"name\": f\"{report_name} attack path\",\n            \"path_steps\": [\n                \"when exposed interfaces remain reachable, attack-pattern--entry exploits software--payment-gateway, lead to release gate delay.\",\n                \"when delivery pressure bypasses controls, software--payment-gateway communicates with infrastructure--prod-payment-cluster, lead to wider production exposure.\",\n            ],\n            \"object_refs\": report_refs,\n        }\n    ]\n\n    threat_scenarios = [\n        {\n            \"scenario\": f\"{pattern.get('name')} threatens {targets[index].get('asset_name') if index < len(targets) else report_name}\",\n            \"stride\": pattern.get(\"stride\"),\n            \"focus\": focus_text or \"release gate\",\n        }\n        for index, pattern in enumerate(attack_patterns)\n    ]\n    risk_evaluation = [\n        {\n            \"attack_pattern_id\": pattern.get(\"id\"),\n            \"risk_level\": pattern.get(\"risk_level\"),\n            \"recommended_action_count\": len(course_of_actions),\n        }\n        for pattern in attack_patterns\n    ]\n\n    security_goals = [\n        {\n            \"id\": \"security-goal--release-gate\",\n            \"name\": \"Protect release decision integrity\",\n            \"goal_type\": \"release-governance\",\n            \"priority\": \"high\",\n            \"description\": \"Ensure production release decisions depend on verified threat evidence and compensating controls.\",\n        }\n    ]\n    if focus_text:\n        security_goals.append(\n            {\n                \"id\": \"security-goal--analysis-focus\",\n                \"name\": \"Protect declared analysis focus\",\n                \"goal_type\": \"business-context\",\n                \"priority\": \"medium\",\n                \"description\": f\"Keep the threat model aligned to the requested focus area: {focus_text}.\",\n            }\n        )\n\n    analysis = {\n        \"methodology\": \"TARA+STRIDE\",\n        \"attack_patterns\": attack_patterns,\n        \"targets\": targets,\n        \"simulated_attack_paths\": simulated_attack_paths,\n        \"observables\": [],\n        \"course_of_actions\": course_of_actions,\n        \"detection_indicators\": [],\n        \"tara_stride_outputs\": {\n            \"threat_scenarios\": threat_scenarios,\n            \"risk_evaluation\": risk_evaluation,\n        },\n        \"security_goals\": security_goals,\n        \"summary\": {\n            \"total_objects\": len(attack_patterns) + len(targets) + len(simulated_attack_paths) + len(course_of_actions) + len(threat_scenarios) + len(risk_evaluation) + len(security_goals),\n            \"attack_patterns\": len(attack_patterns),\n            \"targets\": len(targets),\n            \"simulated_attack_paths\": len(simulated_attack_paths),\n            \"observables\": 0,\n            \"course_of_actions\": len(course_of_actions),\n            \"detection_indicators\": 0,\n            \"threat_scenarios\": len(threat_scenarios),\n            \"risk_evaluation\": len(risk_evaluation),\n            \"security_goals\": len(security_goals),\n        },\n    }\n\n    analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2)\n    download_uri = \"data:application/json;charset=utf-8,\" + urllib.parse.quote(analysis_json)\n    return {\n        \"report_name\": report_name,\n        \"report_id\": str(matched_report.get(\"report_id\") or \"\"),\n        \"match_strategy\": str(matched_report.get(\"match_strategy\") or \"unknown\"),\n        \"download_filename\": str(payload.get(\"download_filename\") or \"threat-model.json\"),\n        \"analysis_json\": analysis_json,\n        \"download_markdown\": f\"[下载 JSON 结果]({download_uri})\",\n        \"summary_text\": f\"Generated {len(attack_patterns)} attack patterns, {len(course_of_actions)} mitigations, and {len(threat_scenarios)} threat scenarios.\",\n    }\n"
+        context:
+          enabled: false
+          variable_selector: []
+        desc: ''
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: Assistant
+            user: Human
+          window:
+            enabled: false
+            size: 10
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: gpt-4o-mini
+          provider: langgenius/openai/openai
+        prompt_template:
+        - edition_type: basic
+          role: system
+          text: |
+            You are the dedicated AI4SEC threat modeling engine for ArchitectureID 1437.
+            Build a single JSON object only.
+
+            Mandatory rules:
+            1. The methodology value MUST be exactly TARA+STRIDE.
+            2. Use only facts grounded in the MCP response JSON. Do not fabricate assets, controls, or observables that are unsupported by the evidence.
+            3. Keep all object names and descriptions in English.
+            4. detection_indicators[].indicator.pattern_type MUST be exactly EQL when you emit detection indicators.
+            5. simulated_attack_paths[].path_steps must be natural-language sentence strings in the style:
+               when <preconditions>, <subject> <predicate> <object>, lead to <result>.
+            6. Return the schema-complete JSON even when some arrays are empty.
+            7. Avoid duplicate objects or semantically duplicated items across sections.
+            8. If the optional analysis focus is present, reflect it in threat_scenarios and security_goals.
+        - edition_type: basic
+          role: user
+          text: |
+            Produce the final threat model from this OpenCTI MCP response.
+
+            Optional analysis focus:
+            {{#start_node.analysis_focus#}}
+
+            MCP response JSON:
+            {{#query_threat_model_report.body#}}
+        reasoning_format: separated
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              attack_patterns:
+                items:
+                  properties:
+                    category:
+                      type: string
+                    description:
+                      type: string
+                    id:
+                      type: string
+                    impact:
+                      type: string
+                    kill_chain_phases:
+                      items:
+                        type: object
+                      type: array
+                    likelihood:
+                      type: string
+                    name:
+                      type: string
+                    risk_level:
+                      type: string
+                    stride:
+                      type: string
+                  required:
+                  - id
+                  - name
+                  - description
+                  - category
+                  - risk_level
+                  - likelihood
+                  - impact
+                  - stride
+                  - kill_chain_phases
+                  type: object
+                type: array
+              course_of_actions:
+                items:
+                  properties:
+                    description:
+                      type: string
+                    id:
+                      type: string
+                    mitigates_attack_pattern_ids:
+                      items:
+                        type: string
+                      type: array
+                    name:
+                      type: string
+                    type:
+                      enum:
+                      - course-of-action
+                      type: string
+                  required:
+                  - id
+                  - type
+                  - name
+                  - description
+                  - mitigates_attack_pattern_ids
+                  type: object
+                type: array
+              detection_indicators:
+                items:
+                  properties:
+                    indicates_attack_pattern_ids:
+                      items:
+                        type: string
+                      type: array
+                    indicator:
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        pattern:
+                          type: string
+                        pattern_type:
+                          enum:
+                          - EQL
+                          type: string
+                        type:
+                          enum:
+                          - indicator
+                          type: string
+                        x_ecs_events:
+                          items:
+                            type: object
+                          type: array
+                      required:
+                      - id
+                      - type
+                      - name
+                      - pattern_type
+                      - pattern
+                      type: object
+                  required:
+                  - indicator
+                  - indicates_attack_pattern_ids
+                  type: object
+                type: array
+              methodology:
+                enum:
+                - TARA+STRIDE
+                type: string
+              observables:
+                items:
+                  type: object
+                type: array
+              security_goals:
+                items:
+                  properties:
+                    description:
+                      type: string
+                    goal_type:
+                      type: string
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    priority:
+                      type: string
+                  required:
+                  - id
+                  - name
+                  - goal_type
+                  - priority
+                  - description
+                  type: object
+                type: array
+              simulated_attack_paths:
+                items:
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    object_refs:
+                      items:
+                        type: string
+                      type: array
+                    path_steps:
+                      items:
+                        type: string
+                      type: array
+                    type:
+                      enum:
+                      - report
+                      type: string
+                  required:
+                  - id
+                  - type
+                  - name
+                  - path_steps
+                  type: object
+                type: array
+              summary:
+                properties:
+                  attack_patterns:
+                    type: integer
+                  course_of_actions:
+                    type: integer
+                  detection_indicators:
+                    type: integer
+                  observables:
+                    type: integer
+                  risk_evaluation:
+                    type: integer
+                  security_goals:
+                    type: integer
+                  simulated_attack_paths:
+                    type: integer
+                  targets:
+                    type: integer
+                  threat_scenarios:
+                    type: integer
+                  total_objects:
+                    type: integer
+                required:
+                - total_objects
+                - attack_patterns
+                - targets
+                - simulated_attack_paths
+                - observables
+                - course_of_actions
+                - detection_indicators
+                - threat_scenarios
+                - risk_evaluation
+                - security_goals
+                type: object
+              tara_stride_outputs:
+                properties:
+                  risk_evaluation:
+                    items:
+                      type: object
+                    type: array
+                  threat_scenarios:
+                    items:
+                      type: object
+                    type: array
+                required:
+                - threat_scenarios
+                - risk_evaluation
+                type: object
+              targets:
+                items:
+                  properties:
+                    asset_name:
+                      type: string
+                    attack_pattern_id:
+                      type: string
+                    intrinsic_value:
+                      type: string
+                    intrinsic_value_dimensions:
+                      items:
+                        type: string
+                      type: array
+                    intrinsic_value_reason:
+                      type: string
+                  required:
+                  - attack_pattern_id
+                  - asset_name
+                  - intrinsic_value
+                  - intrinsic_value_dimensions
+                  - intrinsic_value_reason
+                  type: object
+                type: array
+            required:
+            - methodology
+            - attack_patterns
+            - targets
+            - simulated_attack_paths
+            - observables
+            - course_of_actions
+            - detection_indicators
+            - tara_stride_outputs
+            - security_goals
+            - summary
+            type: object
+        structured_output_enabled: true
+        title: Generate Threat Model
+        type: llm
+        vision:
+          enabled: false
+        selected: false
+      height: 84
+      id: llm_threat_model
+      position:
+        x: 950
+        y: 126
+      positionAbsolute:
+        x: 950
+        y: 126
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+    - data:
+        code: |
+          import json
+          import urllib.parse
+
+          def main(response_json: str, analysis_json_raw: str) -> dict:
+              # // @ArchitectureID: 1436
+              payload = json.loads(response_json)
+              matched_report = payload.get("matched_report") or {}
+              analysis = json.loads(analysis_json_raw)
+              analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2)
+              download_uri = "data:application/json;charset=utf-8," + urllib.parse.quote(analysis_json)
+              summary = analysis.get("summary") or {}
+              return {
+                  "report_name": str(matched_report.get("report_name") or ""),
+                  "report_id": str(matched_report.get("report_id") or ""),
+                  "match_strategy": str(matched_report.get("match_strategy") or "unknown"),
+                  "download_filename": str(payload.get("download_filename") or "threat-model.json"),
+                  "analysis_json": analysis_json,
+                  "download_markdown": f"[下载 JSON 结果]({download_uri})",
+                  "summary_text": (
+                      f"Generated {summary.get('attack_patterns', 0)} attack patterns, "
+                      f"{summary.get('course_of_actions', 0)} mitigations, "
+                      f"{summary.get('threat_scenarios', 0)} threat scenarios, and "
+                      f"{summary.get('detection_indicators', 0)} detection indicators."
+                  ),
+              }
         code_language: python3
         desc: ''
+        selected: false
         outputs:
           analysis_json:
             children: null
@@ -164,60 +562,65 @@ workflow:
           summary_text:
             children: null
             type: string
-        title: Build Threat Model Result
+        title: Format Threat Model Result
         type: code
         variables:
         - value_selector:
-          - query-threat-model-report
+          - query_threat_model_report
           - body
           variable: response_json
         - value_selector:
-          - start_node
-          - analysis_focus
-          variable: analysis_focus
+          - llm_threat_model
+          - text
+          variable: analysis_json_raw
       height: 52
-      id: build-threat-model
+      id: format_threat_model
       position:
-        x: 660
-        y: 108
+        x: 1280
+        y: 140
       positionAbsolute:
-        x: 660
-        y: 108
+        x: 1280
+        y: 140
+      sourcePosition: right
+      targetPosition: left
       type: custom
-      width: 242
+      width: 250
     - data:
-        answer: '已完成 VS1 威胁建模分析。
+        answer: |
+          已完成 VS1 威胁建模分析。
 
-          - 报告名称：{{#build-threat-model.report_name#}}
+          - 报告名称：{{#format_threat_model.report_name#}}
+          - 报告 ID：{{#format_threat_model.report_id#}}
+          - 匹配策略：{{#format_threat_model.match_strategy#}}
+          - 下载文件名：{{#format_threat_model.download_filename#}}
+          - 摘要：{{#format_threat_model.summary_text#}}
 
-          - 报告 ID：{{#build-threat-model.report_id#}}
-
-          - 匹配策略：{{#build-threat-model.match_strategy#}}
-
-          - 下载文件名：{{#build-threat-model.download_filename#}}
-
-          - 摘要：{{#build-threat-model.summary_text#}}
-
-          {{#build-threat-model.download_markdown#}}
+          {{#format_threat_model.download_markdown#}}
 
           结构化结果如下：
 
           ```json
-          {{#build-threat-model.analysis_json#}}
+          {{#format_threat_model.analysis_json#}}
           ```
-
-          '
         desc: ''
+        selected: false
         title: Threat Model Output
         type: answer
         variables: []
-      height: 420
-      id: answer-threat-model
+      height: 430
+      id: answer_threat_model
       position:
-        x: 980
-        y: 84
+        x: 1580
+        y: 82
       positionAbsolute:
-        x: 980
-        y: 84
+        x: 1580
+        y: 82
+      sourcePosition: right
+      targetPosition: left
       type: custom
-      width: 242
+      width: 260
+    viewport:
+      x: 68
+      y: 48
+      zoom: 0.72
+  rag_pipeline_variables: []
