@@ -40,3 +40,17 @@ def test_query_contract_rejects_unknown_field() -> None:
     )
     assert response.status_code == 400
     assert response.json()["code"] == "MCP-4002"
+
+
+def test_threat_model_report_query_contract_returns_filtered_bundle() -> None:
+    response = client.post(
+        "/query/threat-model-report",
+        json={"report_ref": "vs1-payment-threat-model"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "mock"
+    assert payload["matched_report"]["match_strategy"] == "exact-name"
+    assert payload["download_filename"] == "vs1-payment-threat-model-threat-model.json"
+    assert payload["bundle"]["type"] == "bundle"
+    assert payload["bundle"]["objects"][0]["type"] == "report"

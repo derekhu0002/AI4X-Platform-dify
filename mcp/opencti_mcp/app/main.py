@@ -5,7 +5,12 @@ import logging
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from mcp.opencti_mcp.app.models import BundleWriteRequest, ErrorEnvelope, QueryRequest
+from mcp.opencti_mcp.app.models import (
+    BundleWriteRequest,
+    ErrorEnvelope,
+    QueryRequest,
+    ThreatModelReportQueryRequest,
+)
 from mcp.opencti_mcp.app.service import MCPContractError, OpenCTIProjectionService
 from mcp.opencti_mcp.app.settings import OpenCTIMCPSettings
 
@@ -47,6 +52,12 @@ async def healthcheck() -> dict[str, str]:
 async def query_stix(request: QueryRequest) -> dict[str, object]:
     """// @ArchitectureID: 1215"""
     return (await service.query(request)).model_dump()
+
+
+@app.post("/query/threat-model-report")
+async def query_threat_model_report(request: ThreatModelReportQueryRequest) -> dict[str, object]:
+    """// @ArchitectureID: 1215"""
+    return (await service.query_threat_model_report(request)).model_dump()
 
 
 @app.post("/bundle")

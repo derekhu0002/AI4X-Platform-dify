@@ -1,4 +1,4 @@
-from mcp.opencti_mcp.app.models import QueryRequest
+from mcp.opencti_mcp.app.models import QueryRequest, ThreatModelReportQueryRequest
 from mcp.opencti_mcp.app.service import MCPContractError, OpenCTIProjectionService
 from mcp.opencti_mcp.app.settings import OpenCTIMCPSettings
 import httpx
@@ -415,3 +415,51 @@ def test_probe_classifies_token_permission_issue() -> None:
     result = service._classify_probe_error(error)
     assert result["status"] == "blocked"
     assert result["code"] == "CTI-AUTH1"
+
+
+def test_threat_model_report_query_exact_name_returns_filtered_bundle() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=True)
+    service = OpenCTIProjectionService(settings)
+
+    response = asyncio.run(service.query_threat_model_report(ThreatModelReportQueryRequest(report_ref="vs1-payment-threat-model")))
+
+    assert response.source == "mock"
+    assert response.matched_report.match_strategy == "exact-name"
+    assert response.matched_report.report_name == "vs1-payment-threat-model"
+    assert response.download_filename == "vs1-payment-threat-model-threat-model.json"
+    assert response.analysis_input["methodology"] == "TARA+STRIDE"
+    assert response.bundle["objects"][0]["type"] == "report"
+
+
+def test_threat_model_report_query_fuzzy_fallback_prefers_report_name() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=True)
+    service = OpenCTIProjectionService(settings)
+
+    response = asyncio.run(service.query_threat_model_report(ThreatModelReportQueryRequest(report_ref="payment threat")))
+
+    assert response.matched_report.match_strategy == "fuzzy-name"
+    assert response.matched_report.report_id.startswith("report--")
+
+
+def test_threat_model_report_query_filters_out_opencti_specific_fields() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=True)
+    service = OpenCTIProjectionService(settings)
+
+    response = asyncio.run(
+        service.query_threat_model_report(
+            ThreatModelReportQueryRequest(report_ref="report--4eb41da2-0018-4ee9-bd5d-fc8fe82cad11")
+        )
+    )
+
+    report_object = response.bundle["objects"][0]
+    assert "confidence" not in report_object
+    assert "x_opencti_id" not in report_object
+    relationship_objects = [obj for obj in response.bundle["objects"] if obj["type"] == "relationship"]
+    assert relationship_objects
+    assert all("relationship_type" in relation for relation in relationship_objects)

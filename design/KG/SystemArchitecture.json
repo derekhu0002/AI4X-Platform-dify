@@ -509,11 +509,12 @@
 ,"project_info": {
 "tasks": [
 {
-"name": "我需要一个独立的DIFY WORKFLOW AGENT实现子图“威胁建模闭环流程001”描述的业务场景,并补充一个用户故事在design\\userstories\\value_stream_aligned下面"
+"name": "我需要一个独立的DIFY WORKFLOW AGENT实现子图“威胁建模闭环流程001”描述的业务场景"
 ,"type": "ToDo"
 ,"status": "Active"
+,"description": "并补充一个用户故事在design\\userstories\\value_stream_aligned下面\r\n- 独立 Workflow Agent 应新增独立 YAML 工作流文件，而不是在现有统一工作流基础上拆分\r\n- “补充一个用户故事”应新增新的 VS1 衍生用户故事文件，而不是更新现有 VS1-E2E_威胁建模_端到端用户故事.md\r\n- 查询结果下载为JSON文件，存储位置跟随浏览器的默认存储位置,在会话中提供一个下载链接或按钮供用户点击\r\n- LLM 分析结果不需要直接写回 OpenCTI \r\n- 不需要在独立 Workflow 中接入 Notification MCP 完整通知分支\r\n- 用户输入的报告名称与报告 ID 需要首先精确匹配，无法匹配时采用双模糊匹配"
 ,"start_date": "2026-3-17"
-,"due_date": "1899-12-30"
+,"due_date": "2026-3-17"
 ,"reporter": "derek"
 ,"priority": "Low",
 "assigned_to": "llm"

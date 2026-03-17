@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 ProjectionProfile = Literal["minimal", "summary", "analysis", "graph", "notification"]
+ThreatModelMatchStrategy = Literal["exact-id", "exact-name", "fuzzy-id", "fuzzy-name"]
 
 
 class QueryRequest(BaseModel):
@@ -36,6 +37,30 @@ class QueryResponse(BaseModel):
     items: list[dict[str, Any]]
     next_cursor: str | None = None
     has_more: bool = False
+    source: Literal["mock", "opencti"]
+
+
+class ThreatModelReportQueryRequest(BaseModel):
+    """// @ArchitectureID: 1215"""
+
+    report_ref: str = Field(min_length=1)
+
+
+class ThreatModelReportMatch(BaseModel):
+    """// @ArchitectureID: 1215"""
+
+    report_id: str
+    report_name: str
+    match_strategy: ThreatModelMatchStrategy
+
+
+class ThreatModelReportQueryResponse(BaseModel):
+    """// @ArchitectureID: 1215"""
+
+    matched_report: ThreatModelReportMatch
+    bundle: dict[str, Any]
+    analysis_input: dict[str, Any]
+    download_filename: str
     source: Literal["mock", "opencti"]
 
 

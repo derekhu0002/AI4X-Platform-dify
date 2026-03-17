@@ -4,12 +4,22 @@ import asyncio
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import re
+from difflib import SequenceMatcher
 import time
 from typing import Any
 
 import httpx
 
-from mcp.opencti_mcp.app.models import BundleWriteRequest, BundleWriteResponse, QueryRequest, QueryResponse
+from mcp.opencti_mcp.app.models import (
+    BundleWriteRequest,
+    BundleWriteResponse,
+    QueryRequest,
+    QueryResponse,
+    ThreatModelReportMatch,
+    ThreatModelReportQueryRequest,
+    ThreatModelReportQueryResponse,
+)
 from mcp.opencti_mcp.app.settings import OpenCTIMCPSettings
 
 
@@ -86,6 +96,32 @@ DEFAULT_MINIMAL_STIX_FIELDS: dict[str, set[str]] = {
     "relationship": {"id", "type", "relationship_type", "source_ref", "target_ref"},
 }
 
+THREAT_MODEL_BUNDLE_FIELDS: dict[str, set[str]] = {
+    "report": {"id", "type", "spec_version", "name", "description", "published", "report_types", "object_refs"},
+    "identity": {"id", "type", "spec_version", "name", "identity_class", "sectors"},
+    "software": {"id", "type", "spec_version", "name", "version", "vendor"},
+    "infrastructure": {"id", "type", "spec_version", "name", "description", "infrastructure_types"},
+    "vulnerability": {"id", "type", "spec_version", "name", "description"},
+    "attack-pattern": {"id", "type", "spec_version", "name", "description", "kill_chain_phases"},
+    "course-of-action": {"id", "type", "spec_version", "name", "description"},
+    "note": {"id", "type", "spec_version", "abstract", "content", "object_refs"},
+    "opinion": {"id", "type", "spec_version", "opinion", "explanation", "object_refs"},
+    "relationship": {"id", "type", "spec_version", "relationship_type", "description", "source_ref", "target_ref"},
+}
+
+THREAT_MODEL_BUNDLE_ORDER = {
+    "report": 0,
+    "identity": 1,
+    "software": 2,
+    "infrastructure": 3,
+    "vulnerability": 4,
+    "attack-pattern": 5,
+    "course-of-action": 6,
+    "note": 7,
+    "opinion": 8,
+    "relationship": 9,
+}
+
 
 @dataclass
 class MCPContractError(Exception):
@@ -111,6 +147,25 @@ class OpenCTIProjectionService:
         projected = self._project_object(stix_object, fields, request)
         source = "mock" if self.settings.mock_mode else "opencti"
         return QueryResponse(items=[projected], source=source)
+
+    async def query_threat_model_report(
+        self,
+        request: ThreatModelReportQueryRequest,
+    ) -> ThreatModelReportQueryResponse:
+        """// @ArchitectureID: 1215"""
+        bundle = await self._load_threat_model_bundle()
+        matched_report = self._match_report(bundle, request.report_ref)
+        filtered_bundle = self._build_threat_model_bundle(bundle, matched_report.report_id)
+        analysis_input = self._build_threat_model_analysis_input(filtered_bundle, matched_report)
+        source = "mock" if self.settings.mock_mode else "opencti"
+        download_filename = self._build_download_filename(matched_report.report_name)
+        return ThreatModelReportQueryResponse(
+            matched_report=matched_report,
+            bundle=filtered_bundle,
+            analysis_input=analysis_input,
+            download_filename=download_filename,
+            source=source,
+        )
 
     async def write_bundle(self, request: BundleWriteRequest) -> BundleWriteResponse:
         """// @ArchitectureID: 1215"""
@@ -198,6 +253,167 @@ class OpenCTIProjectionService:
                 normalized[object_type.lower()] = {str(field) for field in fields}
 
         return normalized or DEFAULT_MINIMAL_STIX_FIELDS
+
+    async def _load_threat_model_bundle(self) -> dict[str, Any]:
+        """// @ArchitectureID: 1215"""
+        bundle_path = Path(__file__).resolve().parents[3] / "tests/validation/test-data/vs1-payment-threat-model-bundle.json"
+        try:
+            payload = json.loads(bundle_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            raise MCPContractError(
+                "MCP-4007",
+                f"Unable to load threat-model bundle fixture from {bundle_path}.",
+                status_code=500,
+            ) from error
+
+        if payload.get("type") != "bundle":
+            raise MCPContractError("MCP-4008", "Threat-model fixture must be a STIX bundle.", status_code=500)
+        return payload
+
+    def _match_report(self, bundle: dict[str, Any], report_ref: str) -> ThreatModelReportMatch:
+        """// @ArchitectureID: 1215"""
+        reports = [obj for obj in bundle.get("objects", []) if str(obj.get("type", "")).lower() == "report"]
+        if not reports:
+            raise MCPContractError("CTI-4041", "No report object was found in the threat-model bundle.", status_code=404)
+
+        normalized_ref = self._normalize_match_text(report_ref)
+        for report in reports:
+            if normalized_ref == self._normalize_match_text(str(report.get("id", ""))):
+                return ThreatModelReportMatch(
+                    report_id=str(report.get("id", "")),
+                    report_name=str(report.get("name", "")),
+                    match_strategy="exact-id",
+                )
+            if normalized_ref == self._normalize_match_text(str(report.get("name", ""))):
+                return ThreatModelReportMatch(
+                    report_id=str(report.get("id", "")),
+                    report_name=str(report.get("name", "")),
+                    match_strategy="exact-name",
+                )
+
+        scored_candidates: list[tuple[float, str, dict[str, Any]]] = []
+        for report in reports:
+            report_id = str(report.get("id", ""))
+            report_name = str(report.get("name", ""))
+            scored_candidates.append((self._score_fuzzy_match(normalized_ref, self._normalize_match_text(report_id)), "fuzzy-id", report))
+            scored_candidates.append((self._score_fuzzy_match(normalized_ref, self._normalize_match_text(report_name)), "fuzzy-name", report))
+
+        best_score, strategy, best_report = max(scored_candidates, key=lambda item: item[0])
+        if best_score < 0.35:
+            raise MCPContractError(
+                "CTI-4041",
+                f"No report matched '{report_ref}' after exact and fuzzy lookup.",
+                status_code=404,
+            )
+
+        return ThreatModelReportMatch(
+            report_id=str(best_report.get("id", "")),
+            report_name=str(best_report.get("name", "")),
+            match_strategy=strategy,
+        )
+
+    def _normalize_match_text(self, value: str) -> str:
+        """// @ArchitectureID: 1215"""
+        compact = re.sub(r"\s+", " ", value or "").strip().lower()
+        return compact
+
+    def _score_fuzzy_match(self, query: str, candidate: str) -> float:
+        """// @ArchitectureID: 1215"""
+        if not query or not candidate:
+            return 0.0
+        if query in candidate or candidate in query:
+            return 1.0
+        return SequenceMatcher(None, query, candidate).ratio()
+
+    def _build_threat_model_bundle(self, bundle: dict[str, Any], report_id: str) -> dict[str, Any]:
+        """// @ArchitectureID: 1215"""
+        objects = bundle.get("objects", [])
+        objects_by_id = {str(obj.get("id", "")): obj for obj in objects}
+        report = objects_by_id.get(report_id)
+        if report is None:
+            raise MCPContractError("CTI-4041", f"Report {report_id} was not found in the threat-model bundle.", status_code=404)
+
+        included_ids = {report_id, *[str(object_id) for object_id in report.get("object_refs", [])]}
+        changed = True
+        while changed:
+            changed = False
+            for stix_object in objects:
+                object_type = str(stix_object.get("type", "")).lower()
+                object_id = str(stix_object.get("id", ""))
+                if object_type == "relationship":
+                    source_ref = str(stix_object.get("source_ref", ""))
+                    target_ref = str(stix_object.get("target_ref", ""))
+                    if object_id in included_ids or source_ref in included_ids or target_ref in included_ids:
+                        for related_id in (object_id, source_ref, target_ref):
+                            if related_id and related_id not in included_ids:
+                                included_ids.add(related_id)
+                                changed = True
+
+        filtered_objects = []
+        for stix_object in objects:
+            object_id = str(stix_object.get("id", ""))
+            object_type = str(stix_object.get("type", "")).lower()
+            if object_id not in included_ids or object_type not in THREAT_MODEL_BUNDLE_FIELDS:
+                continue
+            filtered_objects.append(self._filter_threat_model_object(stix_object))
+
+        filtered_objects.sort(
+            key=lambda item: (
+                THREAT_MODEL_BUNDLE_ORDER.get(str(item.get("type", "")).lower(), 99),
+                str(item.get("name", item.get("id", ""))),
+            )
+        )
+        return {
+            "type": "bundle",
+            "id": str(bundle.get("id", "bundle--threat-model-query")),
+            "objects": filtered_objects,
+        }
+
+    def _filter_threat_model_object(self, stix_object: dict[str, Any]) -> dict[str, Any]:
+        """// @ArchitectureID: 1215"""
+        object_type = str(stix_object.get("type", "")).lower()
+        allowed_fields = THREAT_MODEL_BUNDLE_FIELDS[object_type]
+        return {field: stix_object.get(field) for field in allowed_fields if field in stix_object}
+
+    def _build_threat_model_analysis_input(
+        self,
+        bundle: dict[str, Any],
+        matched_report: ThreatModelReportMatch,
+    ) -> dict[str, Any]:
+        """// @ArchitectureID: 1215"""
+        objects = bundle.get("objects", [])
+        components = [
+            str(obj.get("name"))
+            for obj in objects
+            if str(obj.get("type", "")).lower() in {"software", "infrastructure"} and obj.get("name")
+        ]
+        assets = [
+            str(obj.get("name"))
+            for obj in objects
+            if str(obj.get("type", "")).lower() == "identity" and obj.get("name")
+        ]
+        report_object = next(
+            (obj for obj in objects if str(obj.get("id", "")) == matched_report.report_id),
+            {"name": matched_report.report_name, "description": ""},
+        )
+        return {
+            "methodology": "TARA+STRIDE",
+            "report": {
+                "id": matched_report.report_id,
+                "name": matched_report.report_name,
+                "description": str(report_object.get("description", "")),
+                "match_strategy": matched_report.match_strategy,
+            },
+            "components": components,
+            "assets": assets,
+            "bundle": bundle,
+            "architecture_description": json.dumps(bundle, ensure_ascii=False),
+        }
+
+    def _build_download_filename(self, report_name: str) -> str:
+        """// @ArchitectureID: 1215"""
+        sanitized = re.sub(r"[^A-Za-z0-9._-]+", "-", report_name.strip()).strip("-") or "threat-model"
+        return f"{sanitized}-threat-model.json"
 
     def _validate_bundle_minimal_fields(self, objects: list[dict[str, Any]]) -> None:
         """// @ArchitectureID: 1215"""
