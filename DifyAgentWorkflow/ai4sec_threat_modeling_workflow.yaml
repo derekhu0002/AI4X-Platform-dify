@@ -519,7 +519,18 @@ workflow:
               # // @ArchitectureID: 1436
               payload = json.loads(response_json)
               matched_report = payload.get("matched_report") or {}
-              analysis = json.loads(analysis_json_raw)
+              
+              # Strip possible Markdown fences from LLM raw JSON output
+              clean_json = analysis_json_raw.strip()
+              if clean_json.startswith('```json'):
+                  clean_json = clean_json[7:]
+              elif clean_json.startswith('```'):
+                  clean_json = clean_json[3:]
+              if clean_json.endswith('```'):
+                  clean_json = clean_json[:-3]
+              clean_json = clean_json.strip()
+              
+              analysis = json.loads(clean_json)
               analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2)
               download_uri = "data:application/json;charset=utf-8," + urllib.parse.quote(analysis_json)
               summary = analysis.get("summary") or {}
