@@ -82,16 +82,51 @@
 
 ## 8. 交付物与验收标准
 
-- [ ] 对象最小字段矩阵配置文件已建立并纳入版本管理。
+- [x] 对象最小字段矩阵配置文件已建立并纳入版本管理。
   手工测试步骤：1) 打开 `config/stix_minimal_field_matrix.json` 检查关键对象类型字段清单；2) 在 Git 变更中确认该文件被版本管理；3) 组织一次评审确认 VS4 所需对象均有最小字段定义。
 - [ ] 真实 OpenCTI 写入路径可用，支持至少一种生产可用导入方式。
-  手工测试步骤：1) 设置 `OPENCTI_MCP_MOCK_MODE=false`；2) 通过 `/bundle` 提交真实 STIX Bundle；3) 接口返回 `mode=opencti` 且 `accepted=true`；4) 在 OpenCTI 界面查询写入对象存在。
+  手工测试步骤：1) 设置 `OPENCTI_MCP_MOCK_MODE=false`；2) 通过 `/bundle` 提交真实 STIX Bundle，样本数据如下（POST 到 `http://localhost:8101/bundle`，Content-Type: application/json）：
+  ```json
+  {
+    "bundle": {
+      "type": "bundle",
+      "id": "bundle--b2865eb1-26d2-421e-9b34-5de2042f49a1",
+      "objects": [
+        {
+          "type": "indicator",
+          "spec_version": "2.1",
+          "id": "indicator--8f69cfe9-8088-411c-bb09-9a33cf0d73d8",
+          "created": "2026-03-14T12:00:00.000Z",
+          "modified": "2026-03-14T12:00:00.000Z",
+          "name": "bola-jwt-mismatch",
+          "indicator_types": ["malicious-activity"],
+          "pattern": "[url:value MATCHES '^https://app.example.local/api/users/.+$']",
+          "pattern_type": "stix",
+          "valid_from": "2026-03-14T10:00:00.000Z"
+        }
+      ]
+    }
+  }
+  ```
+  完整多对象样本参见 `tests/validation/test-data/vs4-bola-monitoring-bundle.json`；3) 接口返回 `mode=opencti` 且 `accepted=true`；4) 在 OpenCTI 界面查询写入对象存在。
+  排障提示：若返回 `CTI-5023`（`Cannot query field "importPush" on type "Mutation"`）或 `CTI-5024`，说明当前 OpenCTI schema 未暴露该导入 mutation（常见于版本差异或 API Token 权限不足）；需核对 OpenCTI 版本兼容性并确认 token 具备导入权限。
 - [ ] 写回后回查验证默认开启并记录一致性时延。
-  手工测试步骤：1) 提交一条写回请求；2) 检查 MCP 日志中是否执行回查与耗时记录；3) 若超出阈值，确认返回或日志中有失败提示；4) 将实测耗时记录到验收表。
+  手工测试步骤：1) 提交一条写回请求；2) 检查 MCP 日志与响应中是否执行回查；日志关键字说明：
+  - **成功**：响应体 `{"accepted": true, "mode": "opencti", ...}`，uvicorn 访问日志 `POST /bundle HTTP/1.1" 200`；
+  - **超出阈值（验证失败）**：响应 HTTP 409，响应体包含 `"code": "CTI-4091"` 及 `"message": "Writeback verification failed within 1.0s for: <object_id>"`，uvicorn 日志 `POST /bundle HTTP/1.1" 409`；
+  - **中间态未找到**：内部 `CTI-4041` 在窗口内自动重试，若超时则升级为 `CTI-4091`；
+  - **阈值配置**：环境变量 `OPENCTI_MCP_WRITEBACK_VERIFY_WINDOW_SECONDS`（默认 `1.0`）；
+  3) 若超出阈值，确认响应体中出现 `CTI-4091` 错误码；4) 将实测耗时记录到验收表。
 - [ ] mock 在生产默认关闭，仅作为本地合同测试兜底。
   手工测试步骤：1) 检查生产环境变量未显式开启 mock；2) 调用 `/query` 或 `/bundle` 确认返回 `source/mode` 非 mock；3) 仅在本地测试环境打开 mock 并记录用途。
 - [ ] 合同测试与集成测试覆盖真实路径，避免“测试通过但生产失效”。
-  手工测试步骤：1) 在 CI 或本地执行合同测试和集成测试；2) 额外在联调环境做一次 `mock_mode=false` 的真实写入回查；3) 对比测试通过与联调结果一致性并归档证据。
+  手工测试步骤（本地/CI 详细执行）：
+  1) 激活虚拟环境：Windows 执行 `.venv\Scripts\Activate.ps1`，Linux/Mac 执行 `source .venv/bin/activate`；
+  2) 执行单元测试：`python -m pytest tests/unit/test_opencti_projection.py -v`，预期全绿；
+  3) 执行合同测试：`python -m pytest tests/contract/test_opencti_api_contract.py -v`，预期全绿（此步骤默认 mock 模式，作为本地合同兜底）；
+  4) 执行集成测试：`python -m pytest tests/integration/test_webhook_to_notification_flow.py -v`，预期全绿；
+  5) 联调环境真实写入验证（需 OpenCTI 实例可达）：设置 `OPENCTI_MCP_MOCK_MODE=false`、`OPENCTI_MCP_OPENCTI_BASE_URL=<真实地址>`、`OPENCTI_MCP_OPENCTI_API_TOKEN=<Token>`，再执行上方样本 `/bundle` POST，确认响应 `mode=opencti` 且对象可在 OpenCTI 界面查到；
+  6) 对比"本地测试全绿"与"联调真实写入成功"两项证据均存在，归档截图与测试运行输出。
 
 ## 9. 风险、阻塞与缓解措施
 

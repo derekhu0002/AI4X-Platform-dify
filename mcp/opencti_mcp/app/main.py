@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
@@ -10,6 +12,22 @@ from mcp.opencti_mcp.app.settings import OpenCTIMCPSettings
 settings = OpenCTIMCPSettings()
 service = OpenCTIProjectionService(settings)
 app = FastAPI(title="ai4sec_opencti_mcp", version="0.1.0")
+logger = logging.getLogger("ai4sec.opencti_mcp")
+
+
+@app.on_event("startup")
+async def startup_probe_write_capability() -> None:
+    """// @ArchitectureID: 1215"""
+    result = await service.probe_write_capability()
+    app.state.write_probe = result
+    message = (
+        "OpenCTI write capability probe: "
+        f"status={result.get('status')} code={result.get('code')} detail={result.get('detail')}"
+    )
+    if result.get("status") in {"blocked"}:
+        logger.warning(message)
+    else:
+        logger.info(message)
 
 
 @app.exception_handler(MCPContractError)

@@ -134,6 +134,45 @@ class OpenCTIProjectionService:
         await self._verify_persisted_objects(object_ids)
         return BundleWriteResponse(accepted=True, persisted_object_ids=object_ids, mode="opencti")
 
+    async def probe_write_capability(self) -> dict[str, str]:
+        """// @ArchitectureID: 1215"""
+        if self.settings.mock_mode:
+            return {
+                "status": "skipped",
+                "code": "MCP-MOCK",
+                "detail": "mock mode enabled; write capability probe skipped.",
+            }
+
+        if not self.settings.opencti_api_token:
+            return {
+                "status": "blocked",
+                "code": "CTI-AUTH0",
+                "detail": "OpenCTI API token is empty; cannot verify write permission.",
+            }
+
+        mutation = """
+        mutation ProbeImportPush($bundle: String!, $update: Boolean!) {
+          importPush(type: "text/json", file: $bundle, update: $update)
+        }
+        """
+
+        # Use an intentionally invalid probe bundle to avoid writing data during startup probe.
+        invalid_probe_bundle = {"type": "bundle", "id": "bundle--startup-probe", "objects": []}
+
+        try:
+            await self._post_graphql(
+                query=mutation,
+                variables={"bundle": json.dumps(invalid_probe_bundle, ensure_ascii=False), "update": False},
+                operation_name="probe_importPush",
+            )
+            return {
+                "status": "ready",
+                "code": "CTI-WRITE-OK",
+                "detail": "OpenCTI import mutation responded successfully during startup probe.",
+            }
+        except MCPContractError as error:
+            return self._classify_probe_error(error)
+
     def _load_minimal_field_matrix(self) -> dict[str, set[str]]:
         """// @ArchitectureID: 1215"""
         config_path = Path(self.settings.stix_minimal_field_matrix_path)
@@ -183,11 +222,70 @@ class OpenCTIProjectionService:
           importPush(type: "text/json", file: $bundle, update: $update)
         }
         """
-        await self._post_graphql(
-            query=mutation,
-            variables={"bundle": json.dumps(bundle, ensure_ascii=False), "update": True},
-            operation_name="importPush",
+        try:
+            await self._post_graphql(
+                query=mutation,
+                variables={"bundle": json.dumps(bundle, ensure_ascii=False), "update": True},
+                operation_name="importPush",
+            )
+        except MCPContractError as error:
+            if self._is_missing_mutation_error(error, "importPush"):
+                raise MCPContractError(
+                    "CTI-5024",
+                    "OpenCTI GraphQL schema does not expose mutation 'importPush'. "
+                    "This is usually caused by OpenCTI version/schema differences or insufficient API token permissions. "
+                    "Please verify the token role has import privileges and confirm the target OpenCTI deployment supports bundle import mutation for this integration.",
+                    status_code=502,
+                ) from error
+            raise
+
+    def _is_missing_mutation_error(self, error: MCPContractError, mutation_name: str) -> bool:
+        """// @ArchitectureID: 1215"""
+        message = (error.message or "").lower()
+        return (
+            error.code == "CTI-5023"
+            and "cannot query field" in message
+            and f'"{mutation_name.lower()}"' in message
+            and "on type \"mutation\"" in message
         )
+
+    def _classify_probe_error(self, error: MCPContractError) -> dict[str, str]:
+        """// @ArchitectureID: 1215"""
+        message = (error.message or "").lower()
+        if self._is_missing_mutation_error(error, "importPush"):
+            return {
+                "status": "blocked",
+                "code": "CTI-5024",
+                "detail": "OpenCTI schema does not expose importPush mutation. Check version compatibility or token scope.",
+            }
+
+        permission_markers = ["not authorized", "forbidden", "permission", "access denied", "unauthorized"]
+        if any(marker in message for marker in permission_markers):
+            return {
+                "status": "blocked",
+                "code": "CTI-AUTH1",
+                "detail": "OpenCTI token is reachable but appears to lack import permission.",
+            }
+
+        if error.code in {"CTI-5031", "CTI-5041", "CTI-5021"}:
+            return {
+                "status": "blocked",
+                "code": error.code,
+                "detail": "OpenCTI endpoint is unreachable or unstable during startup probe.",
+            }
+
+        if error.code == "CTI-5023":
+            return {
+                "status": "reachable",
+                "code": "CTI-PROBE-GQL",
+                "detail": "OpenCTI mutation endpoint is reachable; probe payload was rejected by GraphQL/application rule.",
+            }
+
+        return {
+            "status": "blocked",
+            "code": error.code,
+            "detail": "OpenCTI write capability probe failed with an unclassified error.",
+        }
 
     async def _verify_persisted_objects(self, object_ids: list[str]) -> None:
         """// @ArchitectureID: 1215"""

@@ -1,5 +1,5 @@
 from mcp.opencti_mcp.app.models import QueryRequest
-from mcp.opencti_mcp.app.service import OpenCTIProjectionService
+from mcp.opencti_mcp.app.service import MCPContractError, OpenCTIProjectionService
 from mcp.opencti_mcp.app.settings import OpenCTIMCPSettings
 import httpx
 import pytest
@@ -387,3 +387,31 @@ def test_query_uses_incident_vs2_alias_for_live_opencti_lookup_and_context() -> 
     assert response.items[0]["priority"] == "P2"
     assert response.items[0]["owner_team"] == "secops-team"
     assert response.items[0]["standard_id"] == settings.vs2_object_id
+
+
+def test_probe_classifies_missing_import_mutation() -> None:
+    settings = OpenCTIMCPSettings(mock_mode=False)
+    service = OpenCTIProjectionService(settings)
+    error = MCPContractError(
+        "CTI-5023",
+        'OpenCTI GraphQL returned an application error in probe_importPush: Cannot query field "importPush" on type "Mutation".',
+        status_code=502,
+    )
+
+    result = service._classify_probe_error(error)
+    assert result["status"] == "blocked"
+    assert result["code"] == "CTI-5024"
+
+
+def test_probe_classifies_token_permission_issue() -> None:
+    settings = OpenCTIMCPSettings(mock_mode=False)
+    service = OpenCTIProjectionService(settings)
+    error = MCPContractError(
+        "CTI-5023",
+        "OpenCTI GraphQL returned an application error in probe_importPush: GraphQL introspection not authorized!",
+        status_code=502,
+    )
+
+    result = service._classify_probe_error(error)
+    assert result["status"] == "blocked"
+    assert result["code"] == "CTI-AUTH1"

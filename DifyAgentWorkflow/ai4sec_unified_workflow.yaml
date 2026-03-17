@@ -147,15 +147,6 @@ workflow:
       targetHandle: target
       type: custom
     - data:
-        sourceType: if-else
-        targetType: answer
-      id: edge-router-fallback
-      source: route-intent
-      sourceHandle: source
-      target: answer_router_fallback
-      targetHandle: target
-      type: custom
-    - data:
         sourceType: http-request
         targetType: code
       id: edge-vs1-answer
@@ -220,9 +211,36 @@ workflow:
       type: custom
     - data:
         sourceType: code
-        targetType: answer
+        targetType: if-else
       id: edge-parse-vs4-answer
       source: parse_vs4
+      sourceHandle: source
+      target: vs4-manual-review
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: http-request
+      id: edge-vs4-review-approved-notify
+      source: vs4-manual-review
+      sourceHandle: approved
+      target: notify-vs4
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: if-else
+        targetType: answer
+      id: edge-vs4-review-blocked-answer
+      source: vs4-manual-review
+      sourceHandle: source
+      target: answer-vs4-blocked
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: http-request
+        targetType: answer
+      id: edge-vs4-notify-answer
+      source: notify-vs4
       sourceHandle: source
       target: answer-vs4
       targetHandle: target
@@ -263,6 +281,19 @@ workflow:
           required: false
           type: select
           variable: selected_flow
+        - label: manual_review_decision
+          options:
+          - pending
+          - approved
+          - rejected
+          required: false
+          type: select
+          variable: manual_review_decision
+        - label: notify_primary_recipient
+          max_length: 256
+          required: false
+          type: text-input
+          variable: notify_primary_recipient
       height: 161
       id: start-node
       position:
@@ -935,6 +966,79 @@ workflow:
       type: custom
       width: 242
     - data:
+        cases:
+        - case_id: approved
+          conditions:
+          - comparison_operator: '='
+            id: vs4-manual-approved-en
+            value: approved
+            varType: string
+            variable_selector:
+            - start-node
+            - manual_review_decision
+          - comparison_operator: '='
+            id: vs4-manual-approved-cn
+            value: 通过
+            varType: string
+            variable_selector:
+            - start-node
+            - manual_review_decision
+          logical_operator: or
+        desc: ''
+        title: VS4 Manual Review Gate
+        type: if-else
+      height: 220
+      id: vs4-manual-review
+      position:
+        x: 1119
+        y: 360
+      positionAbsolute:
+        x: 1119
+        y: 360
+      selected: false
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - type: text
+            value: '{"template_type":"monitoring-rule-online","message_title":"VS4 监控规则待上线复核","message_summary":"{{#parse_vs4.scene_type#}}/{{#parse_vs4.severity#}}/{{#parse_vs4.priority#}}","business_impact":"{{#parse_vs4.business_impact#}}","recommended_action":"请基于人工复核结果执行规则上线与回查。","event_type":"ai4sec.vs4.monitoring-rule-online.v1","object_refs":["{{#parse_vs4.risk_object#}}"],"primary_role":"安全运营负责人","approver_role":"业务安全负责人","severity_tier":"high","channels":["email"],"primary_recipients":["{{#start-node.notify_primary_recipient#}}"]}'
+          type: json
+        desc: ''
+        headers: ''
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 2
+          retry_enabled: true
+          retry_interval: 200
+        ssl_verify: true
+        timeout:
+          connect: 10
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+          read: 600
+          write: 600
+        title: Notify VS4 Stakeholders
+        type: http-request
+        url: '{{#env.NOTIFICATION_MCP_URL#}}/dispatch'
+        variables: []
+      height: 142
+      id: notify-vs4
+      position:
+        x: 1310
+        y: 360
+      positionAbsolute:
+        x: 1310
+        y: 360
+      selected: false
+      type: custom
+      width: 242
+    - data:
         answer: '已受理任务，首屏分流信息如下：
 
           - 场景类型：{{#parse_vs1.scene_type#}}
@@ -1163,6 +1267,28 @@ workflow:
         x: 760
         y: 661
       selected: true
+      type: custom
+      width: 242
+    - data:
+        answer: '当前已命中 VS4 场景，但尚未通过人工复核门控，通知与后续动作未执行。
+
+
+          请在入口变量中将 `manual_review_decision` 设置为 `approved`（或“通过”）后重试。
+
+          '
+        desc: ''
+        title: VS4 Manual Review Pending
+        type: answer
+        variables: []
+      height: 168
+      id: answer-vs4-blocked
+      position:
+        x: 1310
+        y: 566
+      positionAbsolute:
+        x: 1310
+        y: 566
+      selected: false
       type: custom
       width: 242
     viewport:
