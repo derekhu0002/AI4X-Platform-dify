@@ -123,6 +123,17 @@ THREAT_MODEL_BUNDLE_ORDER = {
 }
 
 
+@dataclass(frozen=True)
+class LiveReportCandidate:
+    """// @ArchitectureID: 1215"""
+
+    internal_id: str
+    report_id: str
+    report_name: str
+    description: str = ""
+    published: str = ""
+
+
 @dataclass
 class MCPContractError(Exception):
     """// @ArchitectureID: 1215"""
@@ -153,8 +164,11 @@ class OpenCTIProjectionService:
         request: ThreatModelReportQueryRequest,
     ) -> ThreatModelReportQueryResponse:
         """// @ArchitectureID: 1215"""
-        bundle = await self._load_threat_model_bundle()
-        matched_report = self._match_report(bundle, request.report_ref)
+        if self.settings.mock_mode:
+            bundle = await self._load_mock_threat_model_bundle()
+            matched_report = self._match_report(bundle, request.report_ref)
+        else:
+            matched_report, bundle = await self._load_live_threat_model_report_bundle(request.report_ref)
         filtered_bundle = self._build_threat_model_bundle(bundle, matched_report.report_id)
         analysis_input = self._build_threat_model_analysis_input(filtered_bundle, matched_report)
         source = "mock" if self.settings.mock_mode else "opencti"
@@ -254,7 +268,7 @@ class OpenCTIProjectionService:
 
         return normalized or DEFAULT_MINIMAL_STIX_FIELDS
 
-    async def _load_threat_model_bundle(self) -> dict[str, Any]:
+    async def _load_mock_threat_model_bundle(self) -> dict[str, Any]:
         """// @ArchitectureID: 1215"""
         bundle_path = Path(__file__).resolve().parents[3] / "tests/validation/test-data/vs1-payment-threat-model-bundle.json"
         try:
@@ -269,6 +283,502 @@ class OpenCTIProjectionService:
         if payload.get("type") != "bundle":
             raise MCPContractError("MCP-4008", "Threat-model fixture must be a STIX bundle.", status_code=500)
         return payload
+
+    async def _load_live_threat_model_report_bundle(
+        self,
+        report_ref: str,
+    ) -> tuple[ThreatModelReportMatch, dict[str, Any]]:
+        """// @ArchitectureID: 1215"""
+        candidates = await self._list_live_reports()
+        matched_report, candidate = self._match_live_report_candidate(candidates, report_ref)
+        bundle = await self._fetch_live_threat_model_bundle(candidate)
+        return matched_report, bundle
+
+    async def _list_live_reports(self) -> list[LiveReportCandidate]:
+        """// @ArchitectureID: 1215"""
+        query = """
+        query ListReports($first: Int!) {
+          reports(first: $first) {
+            edges {
+              node {
+                id
+                standard_id
+                name
+                description
+                published
+              }
+            }
+          }
+        }
+        """
+        payload = await self._post_graphql(
+            query=query,
+            variables={"first": 100},
+            operation_name="reports",
+        )
+        edges = payload.get("data", {}).get("reports", {}).get("edges", [])
+        candidates: list[LiveReportCandidate] = []
+        for edge in edges:
+            node = edge.get("node") or {}
+            internal_id = str(node.get("id") or "")
+            report_id = str(node.get("standard_id") or "")
+            report_name = str(node.get("name") or "")
+            if not internal_id or not report_id or not report_name:
+                continue
+            candidates.append(
+                LiveReportCandidate(
+                    internal_id=internal_id,
+                    report_id=report_id,
+                    report_name=report_name,
+                    description=str(node.get("description") or ""),
+                    published=str(node.get("published") or ""),
+                )
+            )
+
+        if not candidates:
+            raise MCPContractError("CTI-4041", "No report object was found in OpenCTI.", status_code=404)
+        return candidates
+
+    def _match_live_report_candidate(
+        self,
+        candidates: list[LiveReportCandidate],
+        report_ref: str,
+    ) -> tuple[ThreatModelReportMatch, LiveReportCandidate]:
+        """// @ArchitectureID: 1215"""
+        normalized_ref = self._normalize_match_text(report_ref)
+        for candidate in candidates:
+            if normalized_ref in {
+                self._normalize_match_text(candidate.internal_id),
+                self._normalize_match_text(candidate.report_id),
+            }:
+                return (
+                    ThreatModelReportMatch(
+                        report_id=candidate.report_id,
+                        report_name=candidate.report_name,
+                        match_strategy="exact-id",
+                    ),
+                    candidate,
+                )
+            if normalized_ref == self._normalize_match_text(candidate.report_name):
+                return (
+                    ThreatModelReportMatch(
+                        report_id=candidate.report_id,
+                        report_name=candidate.report_name,
+                        match_strategy="exact-name",
+                    ),
+                    candidate,
+                )
+
+        if normalized_ref.startswith("report--"):
+            alias_name = self._resolve_report_name_from_local_bundles(report_ref)
+            if alias_name and self._normalize_match_text(alias_name) != normalized_ref:
+                for candidate in candidates:
+                    if self._normalize_match_text(candidate.report_name) == self._normalize_match_text(alias_name):
+                        return (
+                            ThreatModelReportMatch(
+                                report_id=candidate.report_id,
+                                report_name=candidate.report_name,
+                                match_strategy="exact-name",
+                            ),
+                            candidate,
+                        )
+
+        matched = self._score_live_report_candidates(candidates, normalized_ref)
+        if matched is None:
+            alias_name = self._resolve_report_name_from_local_bundles(report_ref)
+            if alias_name and self._normalize_match_text(alias_name) != normalized_ref:
+                matched = self._score_live_report_candidates(candidates, self._normalize_match_text(alias_name))
+                if matched is not None:
+                    strategy, candidate = matched
+                    exact_strategy = "exact-name" if strategy == "fuzzy-name" else strategy
+                    return (
+                        ThreatModelReportMatch(
+                            report_id=candidate.report_id,
+                            report_name=candidate.report_name,
+                            match_strategy=exact_strategy,
+                        ),
+                        candidate,
+                    )
+            raise MCPContractError(
+                "CTI-4041",
+                f"No report matched '{report_ref}' after exact and fuzzy lookup.",
+                status_code=404,
+            )
+
+        strategy, candidate = matched
+        return (
+            ThreatModelReportMatch(
+                report_id=candidate.report_id,
+                report_name=candidate.report_name,
+                match_strategy=strategy,
+            ),
+            candidate,
+        )
+
+    def _score_live_report_candidates(
+        self,
+        candidates: list[LiveReportCandidate],
+        normalized_ref: str,
+    ) -> tuple[str, LiveReportCandidate] | None:
+        """// @ArchitectureID: 1215"""
+        scored_candidates: list[tuple[float, str, LiveReportCandidate]] = []
+        for candidate in candidates:
+            scored_candidates.append(
+                (
+                    self._score_fuzzy_match(normalized_ref, self._normalize_match_text(candidate.report_id)),
+                    "fuzzy-id",
+                    candidate,
+                )
+            )
+            scored_candidates.append(
+                (
+                    self._score_fuzzy_match(normalized_ref, self._normalize_match_text(candidate.report_name)),
+                    "fuzzy-name",
+                    candidate,
+                )
+            )
+
+        if not scored_candidates:
+            return None
+
+        best_score, strategy, candidate = max(scored_candidates, key=lambda item: item[0])
+        if best_score < 0.35:
+            return None
+        return strategy, candidate
+
+    def _resolve_report_name_from_local_bundles(self, report_ref: str) -> str | None:
+        """// @ArchitectureID: 1215"""
+        normalized_ref = self._normalize_match_text(report_ref)
+        test_data_dir = Path(__file__).resolve().parents[3] / "tests/validation/test-data"
+        if not test_data_dir.exists():
+            return None
+
+        for bundle_path in sorted(test_data_dir.glob("*.json")):
+            try:
+                payload = json.loads(bundle_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if payload.get("type") != "bundle":
+                continue
+            for stix_object in payload.get("objects", []):
+                if str(stix_object.get("type") or "").lower() != "report":
+                    continue
+                object_id = self._normalize_match_text(str(stix_object.get("id") or ""))
+                if object_id == normalized_ref:
+                    report_name = str(stix_object.get("name") or "").strip()
+                    return report_name or None
+        return None
+
+    async def _fetch_live_threat_model_bundle(self, candidate: LiveReportCandidate) -> dict[str, Any]:
+        """// @ArchitectureID: 1215"""
+        query = """
+        query ThreatModelReportBundle($id: String!, $first: Int!) {
+          stixCoreObject(id: $id) {
+            id
+            standard_id
+            entity_type
+            representative {
+              main
+              secondary
+            }
+            ... on Report {
+              report_name: name
+              description
+              published
+              report_types
+              objects(first: $first) {
+                edges {
+                  node {
+                    __typename
+                    ... on BasicObject {
+                      id
+                      standard_id
+                      entity_type
+                    }
+                    ... on StixObject {
+                      representative {
+                        main
+                        secondary
+                      }
+                    }
+                    ... on AttackPattern {
+                      attack_pattern_name: name
+                      description
+                    }
+                    ... on Indicator {
+                      indicator_name: name
+                      description
+                      pattern_type
+                      pattern
+                      valid_from
+                    }
+                    ... on Software {
+                      software_name: name
+                      vendor
+                      version
+                    }
+                    ... on Infrastructure {
+                      infrastructure_name: name
+                      description
+                      infrastructure_types
+                    }
+                    ... on Identity {
+                      identity_name: name
+                    }
+                    ... on Vulnerability {
+                      vulnerability_name: name
+                      description
+                    }
+                    ... on CourseOfAction {
+                      course_of_action_name: name
+                      description
+                    }
+                    ... on Note {
+                      content
+                    }
+                    ... on Opinion {
+                      opinion
+                      explanation
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        payload = await self._post_graphql(
+            query=query,
+            variables={"id": candidate.internal_id, "first": 200},
+            operation_name="stixCoreObject",
+        )
+        report = payload.get("data", {}).get("stixCoreObject")
+        if not report:
+            raise MCPContractError(
+                "CTI-4041",
+                f"Report {candidate.report_id} was not found in OpenCTI.",
+                status_code=404,
+            )
+
+        object_edges = report.get("objects", {}).get("edges", [])
+        stix_objects: list[dict[str, Any]] = []
+        related_internal_ids: list[str] = []
+        related_standard_ids: set[str] = set()
+
+        for edge in object_edges:
+            node = edge.get("node") or {}
+            stix_object = self._convert_live_node_to_stix(node)
+            if stix_object is None:
+                continue
+            stix_objects.append(stix_object)
+            internal_id = str(node.get("id") or "")
+            standard_id = str(stix_object.get("id") or "")
+            if internal_id and standard_id:
+                related_internal_ids.append(internal_id)
+                related_standard_ids.add(standard_id)
+
+        report_object = {
+            "type": "report",
+            "spec_version": "2.1",
+            "id": candidate.report_id,
+            "name": str(report.get("report_name") or candidate.report_name),
+            "description": str(report.get("description") or candidate.description),
+            "published": str(report.get("published") or candidate.published),
+            "report_types": list(report.get("report_types") or []),
+            "object_refs": [str(stix_object.get("id")) for stix_object in stix_objects if stix_object.get("id")],
+        }
+
+        relationship_objects = await self._fetch_live_relationship_objects(
+            related_internal_ids,
+            related_standard_ids,
+        )
+        return {
+            "type": "bundle",
+            "id": f"bundle--{candidate.report_id.split('--', 1)[-1]}",
+            "objects": [report_object, *stix_objects, *relationship_objects],
+        }
+
+    async def _fetch_live_relationship_objects(
+        self,
+        internal_ids: list[str],
+        allowed_standard_ids: set[str],
+    ) -> list[dict[str, Any]]:
+        """// @ArchitectureID: 1215"""
+        if not internal_ids or not allowed_standard_ids:
+            return []
+
+        query = """
+        query ThreatModelRelationships($ids: [String!], $first: Int!) {
+          fromRelationships: stixCoreRelationships(first: $first, fromId: $ids) {
+            edges {
+              node {
+                id
+                standard_id
+                entity_type
+                relationship_type
+                description
+                from {
+                  ... on BasicObject {
+                    standard_id
+                  }
+                }
+                to {
+                  ... on BasicObject {
+                    standard_id
+                  }
+                }
+              }
+            }
+          }
+          toRelationships: stixCoreRelationships(first: $first, toId: $ids) {
+            edges {
+              node {
+                id
+                standard_id
+                entity_type
+                relationship_type
+                description
+                from {
+                  ... on BasicObject {
+                    standard_id
+                  }
+                }
+                to {
+                  ... on BasicObject {
+                    standard_id
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        payload = await self._post_graphql(
+            query=query,
+            variables={"ids": internal_ids, "first": 200},
+            operation_name="stixCoreRelationships",
+        )
+
+        relationship_objects: dict[str, dict[str, Any]] = {}
+        for key in ("fromRelationships", "toRelationships"):
+            edges = payload.get("data", {}).get(key, {}).get("edges", [])
+            for edge in edges:
+                node = edge.get("node") or {}
+                source_ref = str((node.get("from") or {}).get("standard_id") or "")
+                target_ref = str((node.get("to") or {}).get("standard_id") or "")
+                relationship_id = str(node.get("standard_id") or node.get("id") or "")
+                if not relationship_id or source_ref not in allowed_standard_ids or target_ref not in allowed_standard_ids:
+                    continue
+                relationship_objects[relationship_id] = {
+                    "type": "relationship",
+                    "spec_version": "2.1",
+                    "id": relationship_id,
+                    "relationship_type": str(node.get("relationship_type") or "related-to"),
+                    "source_ref": source_ref,
+                    "target_ref": target_ref,
+                    **(
+                        {"description": str(node.get("description") or "")}
+                        if str(node.get("description") or "")
+                        else {}
+                    ),
+                }
+        return list(relationship_objects.values())
+
+    def _convert_live_node_to_stix(self, node: dict[str, Any]) -> dict[str, Any] | None:
+        """// @ArchitectureID: 1215"""
+        object_id = str(node.get("standard_id") or node.get("id") or "")
+        object_type = self._normalize_entity_type(str(node.get("entity_type") or node.get("__typename") or ""))
+        if not object_id or object_type not in THREAT_MODEL_BUNDLE_FIELDS or object_type == "report":
+            return None
+
+        representative = node.get("representative") or {}
+        description = str(node.get("description") or representative.get("secondary") or "")
+        stix_object: dict[str, Any] = {
+            "type": object_type,
+            "spec_version": "2.1",
+            "id": object_id,
+        }
+
+        if object_type == "attack-pattern":
+            stix_object["name"] = str(node.get("attack_pattern_name") or representative.get("main") or object_id)
+            if description:
+                stix_object["description"] = description
+            kill_chain_phases = list(node.get("kill_chain_phases") or [])
+            if kill_chain_phases:
+                stix_object["kill_chain_phases"] = kill_chain_phases
+            return stix_object
+
+        if object_type == "indicator":
+            stix_object["name"] = str(node.get("indicator_name") or representative.get("main") or object_id)
+            if description:
+                stix_object["description"] = description
+            if node.get("pattern_type"):
+                stix_object["pattern_type"] = str(node.get("pattern_type"))
+            if node.get("pattern"):
+                stix_object["pattern"] = str(node.get("pattern"))
+            if node.get("valid_from"):
+                stix_object["valid_from"] = str(node.get("valid_from"))
+            return stix_object
+
+        if object_type == "software":
+            stix_object["name"] = str(node.get("software_name") or representative.get("main") or object_id)
+            if node.get("vendor"):
+                stix_object["vendor"] = str(node.get("vendor"))
+            if node.get("version"):
+                stix_object["version"] = str(node.get("version"))
+            return stix_object
+
+        if object_type == "infrastructure":
+            stix_object["name"] = str(node.get("infrastructure_name") or representative.get("main") or object_id)
+            if description:
+                stix_object["description"] = description
+            infrastructure_types = list(node.get("infrastructure_types") or [])
+            if infrastructure_types:
+                stix_object["infrastructure_types"] = infrastructure_types
+            return stix_object
+
+        if object_type == "identity":
+            stix_object["name"] = str(node.get("identity_name") or representative.get("main") or object_id)
+            if node.get("identity_class"):
+                stix_object["identity_class"] = str(node.get("identity_class"))
+            sectors = list(node.get("sectors") or [])
+            if sectors:
+                stix_object["sectors"] = sectors
+            return stix_object
+
+        if object_type == "vulnerability":
+            stix_object["name"] = str(node.get("vulnerability_name") or representative.get("main") or object_id)
+            if description:
+                stix_object["description"] = description
+            return stix_object
+
+        if object_type == "course-of-action":
+            stix_object["name"] = str(node.get("course_of_action_name") or representative.get("main") or object_id)
+            if description:
+                stix_object["description"] = description
+            return stix_object
+
+        if object_type == "note":
+            if representative.get("main"):
+                stix_object["abstract"] = str(representative.get("main"))
+            if node.get("content"):
+                stix_object["content"] = str(node.get("content"))
+            elif description:
+                stix_object["content"] = description
+            return stix_object
+
+        if object_type == "opinion":
+            if node.get("opinion"):
+                stix_object["opinion"] = str(node.get("opinion"))
+            if node.get("explanation"):
+                stix_object["explanation"] = str(node.get("explanation"))
+            return stix_object
+
+        return None
+
+    def _normalize_entity_type(self, entity_type: str) -> str:
+        """// @ArchitectureID: 1215"""
+        return entity_type.strip().lower().replace("_", "-")
 
     def _match_report(self, bundle: dict[str, Any], report_ref: str) -> ThreatModelReportMatch:
         """// @ArchitectureID: 1215"""

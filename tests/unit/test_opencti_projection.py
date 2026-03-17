@@ -1,5 +1,5 @@
 from mcp.opencti_mcp.app.models import QueryRequest, ThreatModelReportQueryRequest
-from mcp.opencti_mcp.app.service import MCPContractError, OpenCTIProjectionService
+from mcp.opencti_mcp.app.service import LiveReportCandidate, MCPContractError, OpenCTIProjectionService
 from mcp.opencti_mcp.app.settings import OpenCTIMCPSettings
 import httpx
 import pytest
@@ -463,3 +463,128 @@ def test_threat_model_report_query_filters_out_opencti_specific_fields() -> None
     relationship_objects = [obj for obj in response.bundle["objects"] if obj["type"] == "relationship"]
     assert relationship_objects
     assert all("relationship_type" in relation for relation in relationship_objects)
+
+
+def test_threat_model_report_query_live_mode_prefers_exact_name() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=False)
+    service = OpenCTIProjectionService(settings)
+    candidate = LiveReportCandidate(
+        internal_id="live-report-internal-id",
+        report_id="report--live-standard-id",
+        report_name="vs4-bola-monitoring-rule",
+        description="Design-risk-to-monitoring evidence for the BOLA scenario.",
+        published="2026-03-14T12:00:00.000Z",
+    )
+    bundle = {
+        "type": "bundle",
+        "id": "bundle--live-standard-id",
+        "objects": [
+            {
+                "type": "report",
+                "spec_version": "2.1",
+                "id": "report--live-standard-id",
+                "name": "vs4-bola-monitoring-rule",
+                "description": "Design-risk-to-monitoring evidence for the BOLA scenario.",
+                "published": "2026-03-14T12:00:00.000Z",
+                "report_types": ["threat-report"],
+                "object_refs": [
+                    "software--live-software",
+                    "attack-pattern--live-attack-pattern",
+                ],
+            },
+            {
+                "type": "software",
+                "spec_version": "2.1",
+                "id": "software--live-software",
+                "name": "user-profile-service",
+                "vendor": "AI4SEC Demo",
+                "version": "1.0.0",
+            },
+            {
+                "type": "attack-pattern",
+                "spec_version": "2.1",
+                "id": "attack-pattern--live-attack-pattern",
+                "name": "BOLA",
+                "description": "Broken object level authorization risk on user profile access endpoints.",
+            },
+        ],
+    }
+
+    async def fake_list_live_reports() -> list[LiveReportCandidate]:
+        return [candidate]
+
+    async def fake_fetch_live_threat_model_bundle(_: LiveReportCandidate) -> dict[str, object]:
+        return bundle
+
+    service._list_live_reports = fake_list_live_reports  # type: ignore[method-assign]
+    service._fetch_live_threat_model_bundle = fake_fetch_live_threat_model_bundle  # type: ignore[method-assign]
+
+    response = asyncio.run(service.query_threat_model_report(ThreatModelReportQueryRequest(report_ref="vs4-bola-monitoring-rule")))
+
+    assert response.source == "opencti"
+    assert response.matched_report.match_strategy == "exact-name"
+    assert response.matched_report.report_id == "report--live-standard-id"
+    assert response.bundle["objects"][0]["type"] == "report"
+
+
+def test_threat_model_report_query_live_mode_can_resolve_local_source_report_id_alias() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=False)
+    service = OpenCTIProjectionService(settings)
+    candidate = LiveReportCandidate(
+        internal_id="live-report-internal-id",
+        report_id="report--live-standard-id",
+        report_name="vs4-bola-monitoring-rule",
+        description="Design-risk-to-monitoring evidence for the BOLA scenario.",
+        published="2026-03-14T12:00:00.000Z",
+    )
+    bundle = {
+        "type": "bundle",
+        "id": "bundle--live-standard-id",
+        "objects": [
+            {
+                "type": "report",
+                "spec_version": "2.1",
+                "id": "report--live-standard-id",
+                "name": "vs4-bola-monitoring-rule",
+                "description": "Design-risk-to-monitoring evidence for the BOLA scenario.",
+                "published": "2026-03-14T12:00:00.000Z",
+                "report_types": ["threat-report"],
+                "object_refs": ["indicator--live-indicator"],
+            },
+            {
+                "type": "indicator",
+                "spec_version": "2.1",
+                "id": "indicator--live-indicator",
+                "name": "bola-jwt-mismatch",
+                "description": "Detect requests to user profile resources where the requested user identifier does not match the authenticated subject.",
+                "pattern_type": "stix",
+                "pattern": "[url:value MATCHES '^https://app.example.local/api/users/.+$']",
+                "valid_from": "2026-03-14T10:00:00.000Z",
+            },
+        ],
+    }
+
+    async def fake_list_live_reports() -> list[LiveReportCandidate]:
+        return [candidate]
+
+    async def fake_fetch_live_threat_model_bundle(_: LiveReportCandidate) -> dict[str, object]:
+        return bundle
+
+    service._list_live_reports = fake_list_live_reports  # type: ignore[method-assign]
+    service._fetch_live_threat_model_bundle = fake_fetch_live_threat_model_bundle  # type: ignore[method-assign]
+    service._resolve_report_name_from_local_bundles = lambda report_ref: "vs4-bola-monitoring-rule" if report_ref == "report--cdd45eb6-f1cd-4f17-82b3-ac4bc03fcd58" else None  # type: ignore[method-assign]
+
+    response = asyncio.run(
+        service.query_threat_model_report(
+            ThreatModelReportQueryRequest(report_ref="report--cdd45eb6-f1cd-4f17-82b3-ac4bc03fcd58")
+        )
+    )
+
+    assert response.source == "opencti"
+    assert response.matched_report.match_strategy == "exact-name"
+    assert response.matched_report.report_name == "vs4-bola-monitoring-rule"
+    assert response.download_filename == "vs4-bola-monitoring-rule-threat-model.json"
