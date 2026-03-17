@@ -1,33 +1,72 @@
 app:
-  description: Standalone VS1 threat-modeling workflow that resolves a report from OpenCTI,
-    filters STIX 2.1 evidence, invokes a real LLM with the ArchitectureID 1437 schema,
-    and exposes the final JSON result in-session with a download link.
-  icon: 🧭
+  description: Standalone VS1 threat-modeling workflow that resolves a report from
+    OpenCTI, filters STIX 2.1 evidence, invokes a real LLM with the ArchitectureID
+    1437 schema, and exposes the final JSON result in-session with a download link.
+  icon: 🤖
   icon_background: '#EAF2FF'
   mode: advanced-chat
   name: AI4SEC Threat Modeling Workflow
   use_icon_as_answer_icon: false
-dependencies: []
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.1.19@12ddda76bb473f9beb52d2ea2a67412d54924f93a29465fffb8635ba62b409c3
+    version: null
 kind: app
-version: 0.2.0
-metadata:
-  webhook:
-    auth_required: false
-    entry_mode: dify-native-workflow
+version: 0.6.0
 workflow:
   conversation_variables: []
   environment_variables:
   - description: ''
-    id: env-opencti-mcp-url-threat-model
-    name: OPENCTI_MCP_URL
+    id: env-opencti-graphql-url-threat-model
+    name: OPENCTI_GRAPHQL_URL
     selector:
     - env
-    - OPENCTI_MCP_URL
-    value: http://host.docker.internal:8101
+    - OPENCTI_GRAPHQL_URL
+    value: http://host.docker.internal:8080/graphql
+    value_type: string
+  - description: ''
+    id: env-opencti-admin-token-threat-model
+    name: OPENCTI_ADMIN_TOKEN
+    selector:
+    - env
+    - OPENCTI_ADMIN_TOKEN
+    value: c118a69a-9d60-441f-b30b-a0967694707e
     value_type: string
   features:
     file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
       enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
     opening_statement: 请输入报告名称或报告 ID，我会优先做精确匹配，回查真实 OpenCTI 数据，并执行一次真实 LLM 威胁建模分析。
     retriever_resource:
       enabled: false
@@ -58,7 +97,7 @@ workflow:
       type: custom
     - data:
         sourceType: code
-        targetType: http-request
+        targetType: code
       id: edge-resolve-query_threat_model_report
       source: resolve_report_ref
       sourceHandle: source
@@ -66,7 +105,7 @@ workflow:
       targetHandle: target
       type: custom
     - data:
-        sourceType: http-request
+        sourceType: code
         targetType: llm
       id: edge-query-llm_threat_model
       source: query_threat_model_report
@@ -109,7 +148,7 @@ workflow:
           required: false
           type: paragraph
           variable: analysis_focus
-      height: 116
+      height: 135
       id: start_node
       position:
         x: 30
@@ -122,22 +161,19 @@ workflow:
       type: custom
       width: 242
     - data:
-        code: |
-          def main(report_ref: str | None = None, sys_query: str | None = None) -> dict:
-              # // @ArchitectureID: 1436
-              explicit_ref = str(report_ref or "").strip()
-              query_ref = str(sys_query or "").strip()
-              effective_ref = explicit_ref or query_ref
-              if not effective_ref:
-                  raise ValueError("请直接输入报告名称或报告 ID。")
-              return {"report_ref": effective_ref}
+        code: "def main(report_ref: str | None = None, sys_query: str | None = None)\
+          \ -> dict:\n    # // @ArchitectureID: 1436\n    explicit_ref = str(report_ref\
+          \ or \"\").strip()\n    query_ref = str(sys_query or \"\").strip()\n   \
+          \ effective_ref = explicit_ref or query_ref\n    if not effective_ref:\n\
+          \        raise ValueError(\"请直接输入报告名称或报告 ID。\")\n    return {\"report_ref\"\
+          : effective_ref}\n"
         code_language: python3
         desc: ''
-        selected: false
         outputs:
           report_ref:
             children: null
             type: string
+        selected: false
         title: Resolve Report Reference
         type: code
         variables:
@@ -163,36 +199,358 @@ workflow:
       type: custom
       width: 242
     - data:
-        authorization:
-          config: null
-          type: no-auth
-        body:
-          data:
-          - type: text
-            value: '{"report_ref":"{{#resolve_report_ref.report_ref#}}"}'
-          type: json
+        code: "def main(report_ref: str, opencti_graphql_url: str | None = None, opencti_admin_token:\
+          \ str | None = None) -> dict:\n    # // @ArchitectureID: 1436\n    import\
+          \ json\n    import re\n    from pathlib import Path\n    from urllib import\
+          \ error as urllib_error\n    from urllib import request as urllib_request\n\
+          \n    graph_url = str(opencti_graphql_url or \"\").strip()\n    api_token\
+          \ = str(opencti_admin_token or \"\").strip()\n    effective_ref = str(report_ref\
+          \ or \"\").strip()\n    if not effective_ref:\n        raise ValueError(\"\
+          请直接输入报告名称或报告 ID。\")\n    if not graph_url:\n        raise ValueError(\"\
+          OPENCTI_GRAPHQL_URL 未配置。\")\n    if not api_token:\n        raise ValueError(\"\
+          OPENCTI_ADMIN_TOKEN 未配置。\")\n\n    threat_model_bundle_fields = {\n    \
+          \    \"report\": {\"id\", \"type\", \"spec_version\", \"name\", \"description\"\
+          , \"published\", \"report_types\", \"object_refs\"},\n        \"identity\"\
+          : {\"id\", \"type\", \"spec_version\", \"name\", \"identity_class\", \"\
+          sectors\"},\n        \"software\": {\"id\", \"type\", \"spec_version\",\
+          \ \"name\", \"version\", \"vendor\"},\n        \"infrastructure\": {\"id\"\
+          , \"type\", \"spec_version\", \"name\", \"description\", \"infrastructure_types\"\
+          },\n        \"vulnerability\": {\"id\", \"type\", \"spec_version\", \"name\"\
+          , \"description\"},\n        \"attack-pattern\": {\"id\", \"type\", \"spec_version\"\
+          , \"name\", \"description\", \"kill_chain_phases\"},\n        \"course-of-action\"\
+          : {\"id\", \"type\", \"spec_version\", \"name\", \"description\"},\n   \
+          \     \"note\": {\"id\", \"type\", \"spec_version\", \"abstract\", \"content\"\
+          , \"object_refs\"},\n        \"opinion\": {\"id\", \"type\", \"spec_version\"\
+          , \"opinion\", \"explanation\", \"object_refs\"},\n        \"relationship\"\
+          : {\"id\", \"type\", \"spec_version\", \"relationship_type\", \"description\"\
+          , \"source_ref\", \"target_ref\"},\n    }\n    threat_model_bundle_order\
+          \ = {\n        \"report\": 0,\n        \"identity\": 1,\n        \"software\"\
+          : 2,\n        \"infrastructure\": 3,\n        \"vulnerability\": 4,\n  \
+          \      \"attack-pattern\": 5,\n        \"course-of-action\": 6,\n      \
+          \  \"note\": 7,\n        \"opinion\": 8,\n        \"relationship\": 9,\n\
+          \    }\n\n    def normalize(value: str) -> str:\n        return re.sub(r\"\
+          \\s+\", \" \", value or \"\").strip().lower()\n\n    def build_download_filename(report_name:\
+          \ str) -> str:\n        sanitized = re.sub(r\"[^A-Za-z0-9._-]+\", \"-\"\
+          , report_name.strip()).strip(\"-\") or \"threat-model\"\n        return\
+          \ f\"{sanitized}-threat-model.json\"\n\n    def post_graphql(query: str,\
+          \ variables: dict, operation_name: str) -> dict:\n        request_body =\
+          \ json.dumps(\n            {\"query\": query, \"variables\": variables,\
+          \ \"operationName\": operation_name},\n            ensure_ascii=False,\n\
+          \        ).encode(\"utf-8\")\n        request = urllib_request.Request(\n\
+          \            graph_url,\n            data=request_body,\n            headers={\n\
+          \                \"Content-Type\": \"application/json\",\n             \
+          \   \"Authorization\": f\"Bearer {api_token}\",\n            },\n      \
+          \      method=\"POST\",\n        )\n        try:\n            with urllib_request.urlopen(request,\
+          \ timeout=60) as response:\n                payload = json.loads(response.read().decode(\"\
+          utf-8\"))\n        except urllib_error.HTTPError as error:\n           \
+          \ detail = error.read().decode(\"utf-8\", errors=\"ignore\")\n         \
+          \   raise ValueError(f\"OpenCTI GraphQL HTTP {error.code}: {detail}\") from\
+          \ error\n        except urllib_error.URLError as error:\n            raise\
+          \ ValueError(f\"OpenCTI GraphQL 不可达: {error.reason}\") from error\n\n  \
+          \      graphql_errors = payload.get(\"errors\") or []\n        if graphql_errors:\n\
+          \            message = graphql_errors[0].get(\"message\") if isinstance(graphql_errors[0],\
+          \ dict) else str(graphql_errors[0])\n            raise ValueError(f\"OpenCTI\
+          \ GraphQL 错误: {message}\")\n        return payload.get(\"data\") or {}\n\
+          \n    def query_report_by_id(candidate_ref: str) -> dict | None:\n     \
+          \   query = \"\"\"\n        query ReportById($id: String!) {\n         \
+          \ stixCoreObject(id: $id) {\n            id\n            standard_id\n \
+          \           entity_type\n            ... on Report {\n              name\n\
+          \              description\n              published\n              report_types\n\
+          \            }\n          }\n        }\n        \"\"\"\n        data = post_graphql(query,\
+          \ {\"id\": candidate_ref}, \"ReportById\")\n        node = data.get(\"stixCoreObject\"\
+          )\n        if not node:\n            return None\n        if str(node.get(\"\
+          entity_type\") or \"\").lower() != \"report\":\n            return None\n\
+          \        internal_id = str(node.get(\"id\") or \"\")\n        report_id\
+          \ = str(node.get(\"standard_id\") or \"\")\n        report_name = str(node.get(\"\
+          name\") or \"\")\n        if not internal_id or not report_id or not report_name:\n\
+          \            return None\n        return {\n            \"internal_id\"\
+          : internal_id,\n            \"report_id\": report_id,\n            \"report_name\"\
+          : report_name,\n            \"description\": str(node.get(\"description\"\
+          ) or \"\"),\n            \"published\": str(node.get(\"published\") or \"\
+          \"),\n        }\n\n    def query_report_by_exact_name(candidate_name: str)\
+          \ -> dict | None:\n        normalized_name = normalize(candidate_name)\n\
+          \        if not normalized_name:\n            return None\n        query\
+          \ = \"\"\"\n        query ReportByExactName($filters: FilterGroup, $first:\
+          \ Int!) {\n          reports(filters: $filters, first: $first) {\n     \
+          \       edges {\n              node {\n                id\n            \
+          \    standard_id\n                name\n                description\n  \
+          \              published\n              }\n            }\n          }\n\
+          \        }\n        \"\"\"\n        data = post_graphql(\n            query,\n\
+          \            {\n                \"first\": 2,\n                \"filters\"\
+          : {\n                    \"mode\": \"and\",\n                    \"filterGroups\"\
+          : [],\n                    \"filters\": [\n                        {\n \
+          \                           \"key\": \"name\",\n                       \
+          \     \"values\": [candidate_name],\n                            \"operator\"\
+          : \"eq\",\n                            \"mode\": \"or\",\n             \
+          \           }\n                    ],\n                },\n            },\n\
+          \            \"ReportByExactName\",\n        )\n        matches = []\n \
+          \       for edge in data.get(\"reports\", {}).get(\"edges\", []):\n    \
+          \        node = edge.get(\"node\") or {}\n            internal_id = str(node.get(\"\
+          id\") or \"\")\n            report_id = str(node.get(\"standard_id\") or\
+          \ \"\")\n            report_name = str(node.get(\"name\") or \"\")\n   \
+          \         if not internal_id or not report_id or not report_name:\n    \
+          \            continue\n            if normalize(report_name) != normalized_name:\n\
+          \                continue\n            matches.append(\n               \
+          \ {\n                    \"internal_id\": internal_id,\n               \
+          \     \"report_id\": report_id,\n                    \"report_name\": report_name,\n\
+          \                    \"description\": str(node.get(\"description\") or \"\
+          \"),\n                    \"published\": str(node.get(\"published\") or\
+          \ \"\"),\n                }\n            )\n        if not matches:\n  \
+          \          return None\n        if len(matches) > 1:\n            raise\
+          \ ValueError(f\"报告名称 '{candidate_name}' 命中了多个精确匹配结果。\")\n        return\
+          \ matches[0]\n\n    def resolve_report_name_from_local_bundles(candidate_ref:\
+          \ str) -> str | None:\n        search_roots = [Path.cwd(), *Path.cwd().parents]\n\
+          \        for root in search_roots:\n            test_data_dir = root / \"\
+          tests\" / \"validation\" / \"test-data\"\n            if not test_data_dir.exists():\n\
+          \                continue\n            for bundle_path in sorted(test_data_dir.glob(\"\
+          *.json\")):\n                try:\n                    payload = json.loads(bundle_path.read_text(encoding=\"\
+          utf-8\"))\n                except (OSError, ValueError):\n             \
+          \       continue\n                if payload.get(\"type\") != \"bundle\"\
+          :\n                    continue\n                for stix_object in payload.get(\"\
+          objects\", []):\n                    if str(stix_object.get(\"type\") or\
+          \ \"\").lower() != \"report\":\n                        continue\n     \
+          \               if normalize(str(stix_object.get(\"id\") or \"\")) == normalize(candidate_ref):\n\
+          \                        report_name = str(stix_object.get(\"name\") or\
+          \ \"\").strip()\n                        return report_name or None\n  \
+          \      return None\n\n    def normalize_entity_type(entity_type: str) ->\
+          \ str:\n        return entity_type.strip().lower().replace(\"_\", \"-\"\
+          )\n\n    def convert_live_node_to_stix(node: dict) -> dict | None:\n   \
+          \     object_id = str(node.get(\"standard_id\") or node.get(\"id\") or \"\
+          \")\n        object_type = normalize_entity_type(str(node.get(\"entity_type\"\
+          ) or node.get(\"__typename\") or \"\"))\n        if not object_id or object_type\
+          \ not in threat_model_bundle_fields or object_type == \"report\":\n    \
+          \        return None\n\n        representative = node.get(\"representative\"\
+          ) or {}\n        description = str(node.get(\"description\") or representative.get(\"\
+          secondary\") or \"\")\n        stix_object = {\"type\": object_type, \"\
+          spec_version\": \"2.1\", \"id\": object_id}\n\n        if object_type ==\
+          \ \"attack-pattern\":\n            stix_object[\"name\"] = str(node.get(\"\
+          attack_pattern_name\") or representative.get(\"main\") or object_id)\n \
+          \           if description:\n                stix_object[\"description\"\
+          ] = description\n            kill_chain_phases = list(node.get(\"kill_chain_phases\"\
+          ) or [])\n            if kill_chain_phases:\n                stix_object[\"\
+          kill_chain_phases\"] = kill_chain_phases\n            return stix_object\n\
+          \n        if object_type == \"indicator\":\n            stix_object[\"name\"\
+          ] = str(node.get(\"indicator_name\") or representative.get(\"main\") or\
+          \ object_id)\n            if description:\n                stix_object[\"\
+          description\"] = description\n            if node.get(\"pattern_type\"):\n\
+          \                stix_object[\"pattern_type\"] = str(node.get(\"pattern_type\"\
+          ))\n            if node.get(\"pattern\"):\n                stix_object[\"\
+          pattern\"] = str(node.get(\"pattern\"))\n            if node.get(\"valid_from\"\
+          ):\n                stix_object[\"valid_from\"] = str(node.get(\"valid_from\"\
+          ))\n            return stix_object\n\n        if object_type == \"software\"\
+          :\n            stix_object[\"name\"] = str(node.get(\"software_name\") or\
+          \ representative.get(\"main\") or object_id)\n            if node.get(\"\
+          vendor\"):\n                stix_object[\"vendor\"] = str(node.get(\"vendor\"\
+          ))\n            if node.get(\"version\"):\n                stix_object[\"\
+          version\"] = str(node.get(\"version\"))\n            return stix_object\n\
+          \n        if object_type == \"infrastructure\":\n            stix_object[\"\
+          name\"] = str(node.get(\"infrastructure_name\") or representative.get(\"\
+          main\") or object_id)\n            if description:\n                stix_object[\"\
+          description\"] = description\n            infrastructure_types = list(node.get(\"\
+          infrastructure_types\") or [])\n            if infrastructure_types:\n \
+          \               stix_object[\"infrastructure_types\"] = infrastructure_types\n\
+          \            return stix_object\n\n        if object_type == \"identity\"\
+          :\n            stix_object[\"name\"] = str(node.get(\"identity_name\") or\
+          \ representative.get(\"main\") or object_id)\n            if node.get(\"\
+          identity_class\"):\n                stix_object[\"identity_class\"] = str(node.get(\"\
+          identity_class\"))\n            sectors_payload = node.get(\"sectors\") or {}\n            sectors = [\n                str(((edge.get(\"node\") or {}).get(\"name\") or \"\")).strip()\n                for edge in list(sectors_payload.get(\"edges\") or [])\n                if str(((edge.get(\"node\") or {}).get(\"name\") or \"\")).strip()\n            ]\n            if sectors:\n                stix_object[\"sectors\"] = sectors\n            return stix_object\n\n        if object_type ==\
+          \ \"vulnerability\":\n            stix_object[\"name\"] = str(node.get(\"\
+          vulnerability_name\") or representative.get(\"main\") or object_id)\n  \
+          \          if description:\n                stix_object[\"description\"\
+          ] = description\n            return stix_object\n\n        if object_type\
+          \ == \"course-of-action\":\n            stix_object[\"name\"] = str(node.get(\"\
+          course_of_action_name\") or representative.get(\"main\") or object_id)\n\
+          \            if description:\n                stix_object[\"description\"\
+          ] = description\n            return stix_object\n\n        if object_type\
+          \ == \"note\":\n            if representative.get(\"main\"):\n         \
+          \       stix_object[\"abstract\"] = str(representative.get(\"main\"))\n\
+          \            if node.get(\"content\"):\n                stix_object[\"content\"\
+          ] = str(node.get(\"content\"))\n            elif description:\n        \
+          \        stix_object[\"content\"] = description\n            return stix_object\n\
+          \n        if object_type == \"opinion\":\n            if node.get(\"opinion\"\
+          ):\n                stix_object[\"opinion\"] = str(node.get(\"opinion\"\
+          ))\n            if node.get(\"explanation\"):\n                stix_object[\"\
+          explanation\"] = str(node.get(\"explanation\"))\n            return stix_object\n\
+          \n        return None\n\n    def fetch_relationship_objects(internal_ids:\
+          \ list[str], allowed_standard_ids: set[str]) -> list[dict]:\n        if\
+          \ not internal_ids or not allowed_standard_ids:\n            return []\n\
+          \        query = \"\"\"\n        query ThreatModelRelationships($ids: [String!],\
+          \ $first: Int!) {\n          fromRelationships: stixCoreRelationships(first:\
+          \ $first, fromId: $ids) {\n            edges {\n              node {\n \
+          \               id\n                standard_id\n                entity_type\n\
+          \                relationship_type\n                description\n      \
+          \          from { ... on BasicObject { standard_id } }\n               \
+          \ to { ... on BasicObject { standard_id } }\n              }\n         \
+          \   }\n          }\n          toRelationships: stixCoreRelationships(first:\
+          \ $first, toId: $ids) {\n            edges {\n              node {\n   \
+          \             id\n                standard_id\n                entity_type\n\
+          \                relationship_type\n                description\n      \
+          \          from { ... on BasicObject { standard_id } }\n               \
+          \ to { ... on BasicObject { standard_id } }\n              }\n         \
+          \   }\n          }\n        }\n        \"\"\"\n        data = post_graphql(query,\
+          \ {\"ids\": internal_ids, \"first\": 200}, \"ThreatModelRelationships\"\
+          )\n        relationship_objects = {}\n        for key in (\"fromRelationships\"\
+          , \"toRelationships\"):\n            for edge in data.get(key, {}).get(\"\
+          edges\", []):\n                node = edge.get(\"node\") or {}\n       \
+          \         source_ref = str((node.get(\"from\") or {}).get(\"standard_id\"\
+          ) or \"\")\n                target_ref = str((node.get(\"to\") or {}).get(\"\
+          standard_id\") or \"\")\n                relationship_id = str(node.get(\"\
+          standard_id\") or node.get(\"id\") or \"\")\n                if not relationship_id\
+          \ or source_ref not in allowed_standard_ids or target_ref not in allowed_standard_ids:\n\
+          \                    continue\n                relationship_objects[relationship_id]\
+          \ = {\n                    \"type\": \"relationship\",\n               \
+          \     \"spec_version\": \"2.1\",\n                    \"id\": relationship_id,\n\
+          \                    \"relationship_type\": str(node.get(\"relationship_type\"\
+          ) or \"related-to\"),\n                    \"source_ref\": source_ref,\n\
+          \                    \"target_ref\": target_ref,\n                    **({\"\
+          description\": str(node.get(\"description\") or \"\")} if str(node.get(\"\
+          description\") or \"\") else {}),\n                }\n        return list(relationship_objects.values())\n\
+          \n    def fetch_live_threat_model_bundle(candidate: dict) -> dict:\n   \
+          \     query = \"\"\"\n        query ThreatModelReportBundle($id: String!,\
+          \ $first: Int!) {\n          stixCoreObject(id: $id) {\n            id\n\
+          \            standard_id\n            entity_type\n            representative\
+          \ { main secondary }\n            ... on Report {\n              report_name:\
+          \ name\n              description\n              published\n           \
+          \   report_types\n              objects(first: $first) {\n             \
+          \   edges {\n                  node {\n                    __typename\n\
+          \                    ... on BasicObject { id standard_id entity_type }\n\
+          \                    ... on StixObject { representative { main secondary\
+          \ } }\n                    ... on AttackPattern { attack_pattern_name: name\
+          \ description kill_chain_phases: killChainPhases { kill_chain_name phase_name } }\n\
+          \                    ... on Indicator { indicator_name: name description pattern_type pattern valid_from }\n\
+          \                    ... on Software { software_name: name vendor version\
+          \ }\n                    ... on Infrastructure { infrastructure_name: name\
+          \ description infrastructure_types }\n                    ... on Identity\
+          \ { identity_name: name identity_class }\n                    ... on Organization { sectors { edges { node { name } } } }\n                    ...\
+          \ on Vulnerability { vulnerability_name: name description }\n          \
+          \          ... on CourseOfAction { course_of_action_name: name description\
+          \ }\n                    ... on Note { content }\n                    ...\
+          \ on Opinion { opinion explanation }\n                  }\n            \
+          \    }\n              }\n            }\n          }\n        }\n       \
+          \ \"\"\"\n        data = post_graphql(query, {\"id\": candidate[\"internal_id\"\
+          ], \"first\": 200}, \"ThreatModelReportBundle\")\n        report = data.get(\"\
+          stixCoreObject\")\n        if not report:\n            raise ValueError(f\"\
+          OpenCTI 中未找到报告 {candidate['report_id']}。\")\n\n        stix_objects = []\n\
+          \        related_internal_ids = []\n        related_standard_ids = set()\n\
+          \        for edge in report.get(\"objects\", {}).get(\"edges\", []):\n \
+          \           node = edge.get(\"node\") or {}\n            stix_object = convert_live_node_to_stix(node)\n\
+          \            if stix_object is None:\n                continue\n       \
+          \     stix_objects.append(stix_object)\n            internal_id = str(node.get(\"\
+          id\") or \"\")\n            standard_id = str(stix_object.get(\"id\") or\
+          \ \"\")\n            if internal_id and standard_id:\n                related_internal_ids.append(internal_id)\n\
+          \                related_standard_ids.add(standard_id)\n\n        report_object\
+          \ = {\n            \"type\": \"report\",\n            \"spec_version\":\
+          \ \"2.1\",\n            \"id\": candidate[\"report_id\"],\n            \"\
+          name\": str(report.get(\"report_name\") or candidate[\"report_name\"]),\n\
+          \            \"description\": str(report.get(\"description\") or candidate.get(\"\
+          description\") or \"\"),\n            \"published\": str(report.get(\"published\"\
+          ) or candidate.get(\"published\") or \"\"),\n            \"report_types\"\
+          : list(report.get(\"report_types\") or []),\n            \"object_refs\"\
+          : [str(obj.get(\"id\")) for obj in stix_objects if obj.get(\"id\")],\n \
+          \       }\n        relationship_objects = fetch_relationship_objects(related_internal_ids,\
+          \ related_standard_ids)\n        return {\n            \"type\": \"bundle\"\
+          ,\n            \"id\": f\"bundle--{candidate['report_id'].split('--', 1)[-1]}\"\
+          ,\n            \"objects\": [report_object, *stix_objects, *relationship_objects],\n\
+          \        }\n\n    def filter_threat_model_object(stix_object: dict) -> dict:\n\
+          \        object_type = str(stix_object.get(\"type\", \"\")).lower()\n  \
+          \      allowed_fields = threat_model_bundle_fields[object_type]\n      \
+          \  return {field: stix_object.get(field) for field in allowed_fields if\
+          \ field in stix_object}\n\n    def build_threat_model_bundle(bundle: dict,\
+          \ report_id: str) -> dict:\n        objects = bundle.get(\"objects\", [])\n\
+          \        objects_by_id = {str(obj.get(\"id\", \"\")): obj for obj in objects}\n\
+          \        report = objects_by_id.get(report_id)\n        if report is None:\n\
+          \            raise ValueError(f\"报告 {report_id} 不在威胁建模 bundle 中。\")\n  \
+          \      included_ids = {report_id, *[str(object_id) for object_id in report.get(\"\
+          object_refs\", [])]}\n        changed = True\n        while changed:\n \
+          \           changed = False\n            for stix_object in objects:\n \
+          \               object_type = str(stix_object.get(\"type\", \"\")).lower()\n\
+          \                object_id = str(stix_object.get(\"id\", \"\"))\n      \
+          \          if object_type == \"relationship\":\n                    source_ref\
+          \ = str(stix_object.get(\"source_ref\", \"\"))\n                    target_ref\
+          \ = str(stix_object.get(\"target_ref\", \"\"))\n                    if object_id\
+          \ in included_ids or source_ref in included_ids or target_ref in included_ids:\n\
+          \                        for related_id in (object_id, source_ref, target_ref):\n\
+          \                            if related_id and related_id not in included_ids:\n\
+          \                                included_ids.add(related_id)\n        \
+          \                        changed = True\n\n        filtered_objects = []\n\
+          \        for stix_object in objects:\n            object_id = str(stix_object.get(\"\
+          id\", \"\"))\n            object_type = str(stix_object.get(\"type\", \"\
+          \")).lower()\n            if object_id not in included_ids or object_type\
+          \ not in threat_model_bundle_fields:\n                continue\n       \
+          \     filtered_objects.append(filter_threat_model_object(stix_object))\n\
+          \        filtered_objects.sort(\n            key=lambda item: (\n      \
+          \          threat_model_bundle_order.get(str(item.get(\"type\", \"\")).lower(),\
+          \ 99),\n                str(item.get(\"name\", item.get(\"id\", \"\"))),\n\
+          \            )\n        )\n        return {\"type\": \"bundle\", \"id\"\
+          : str(bundle.get(\"id\", \"bundle--threat-model-query\")), \"objects\":\
+          \ filtered_objects}\n\n    def build_threat_model_analysis_input(bundle:\
+          \ dict, matched_report: dict) -> dict:\n        objects = bundle.get(\"\
+          objects\", [])\n        components = [\n            str(obj.get(\"name\"\
+          ))\n            for obj in objects\n            if str(obj.get(\"type\"\
+          , \"\")).lower() in {\"software\", \"infrastructure\"} and obj.get(\"name\"\
+          )\n        ]\n        assets = [\n            str(obj.get(\"name\"))\n \
+          \           for obj in objects\n            if str(obj.get(\"type\", \"\"\
+          )).lower() == \"identity\" and obj.get(\"name\")\n        ]\n        report_object\
+          \ = next(\n            (obj for obj in objects if str(obj.get(\"id\", \"\
+          \")) == matched_report[\"report_id\"]),\n            {\"name\": matched_report[\"\
+          report_name\"], \"description\": \"\"},\n        )\n        return {\n \
+          \           \"methodology\": \"TARA+STRIDE\",\n            \"report\": {\n\
+          \                \"id\": matched_report[\"report_id\"],\n              \
+          \  \"name\": matched_report[\"report_name\"],\n                \"description\"\
+          : str(report_object.get(\"description\", \"\")),\n                \"match_strategy\"\
+          : matched_report[\"match_strategy\"],\n            },\n            \"components\"\
+          : components,\n            \"assets\": assets,\n        }\n\n    matched_candidate = query_report_by_id(effective_ref)\n\
+          \    matched_report = None\n    if matched_candidate is not None:\n    \
+          \    matched_report = {\n            \"report_id\": matched_candidate[\"\
+          report_id\"],\n            \"report_name\": matched_candidate[\"report_name\"\
+          ],\n            \"match_strategy\": \"exact-id\",\n        }\n    else:\n\
+          \        alias_name = resolve_report_name_from_local_bundles(effective_ref)\
+          \ if normalize(effective_ref).startswith(\"report--\") else None\n     \
+          \   if alias_name and normalize(alias_name) != normalize(effective_ref):\n\
+          \            matched_candidate = query_report_by_exact_name(alias_name)\n\
+          \            if matched_candidate is not None:\n                matched_report\
+          \ = {\n                    \"report_id\": matched_candidate[\"report_id\"\
+          ],\n                    \"report_name\": matched_candidate[\"report_name\"\
+          ],\n                    \"match_strategy\": \"exact-name\",\n          \
+          \      }\n        if matched_report is None:\n            matched_candidate\
+          \ = query_report_by_exact_name(effective_ref)\n            if matched_candidate\
+          \ is not None:\n                matched_report = {\n                   \
+          \ \"report_id\": matched_candidate[\"report_id\"],\n                   \
+          \ \"report_name\": matched_candidate[\"report_name\"],\n               \
+          \     \"match_strategy\": \"exact-name\",\n                }\n\n    if matched_candidate\
+          \ is None or matched_report is None:\n        raise ValueError(f\"未找到报告：{effective_ref}。仅支持\
+          \ report ID 或精确报告名称。\")\n\n    live_bundle = fetch_live_threat_model_bundle(matched_candidate)\n\
+          \    filtered_bundle = build_threat_model_bundle(live_bundle, matched_report[\"\
+          report_id\"])\n    analysis_input = build_threat_model_analysis_input(filtered_bundle,\
+          \ matched_report)\n    response_payload = {\n        \"matched_report\"\
+          : matched_report,\n        \"bundle\": filtered_bundle,\n        \"analysis_input\"\
+          : analysis_input,\n        \"download_filename\": build_download_filename(matched_report[\"\
+          report_name\"]),\n        \"source\": \"opencti\",\n    }\n    response_json\
+          \ = json.dumps(response_payload, ensure_ascii=False)\n    return {\"response_json\"\
+          : response_json}\n"
+        code_language: python3
         desc: ''
-        headers: ''
-        method: post
-        params: ''
-        retry_config:
-          max_retries: 3
-          retry_enabled: true
-          retry_interval: 100
-        ssl_verify: true
-        timeout:
-          connect: 10
-          max_connect_timeout: 10
-          max_read_timeout: 600
-          max_write_timeout: 600
-          read: 600
-          write: 600
-        title: Query Threat Model Report
-        type: http-request
-        url: '{{#env.OPENCTI_MCP_URL#}}/query/threat-model-report'
-        variables: []
+        outputs:
+          response_json:
+            children: null
+            type: string
         selected: false
-      height: 142
+        title: Query Threat Model Report
+        type: code
+        variables:
+        - value_selector:
+          - resolve_report_ref
+          - report_ref
+          variable: report_ref
+        - value_selector:
+          - env
+          - OPENCTI_GRAPHQL_URL
+          variable: opencti_graphql_url
+        - value_selector:
+          - env
+          - OPENCTI_ADMIN_TOKEN
+          variable: opencti_admin_token
+      height: 52
       id: query_threat_model_report
       position:
         x: 630
@@ -218,39 +576,92 @@ workflow:
             enabled: false
             size: 10
         model:
-          completion_params:
-            temperature: 0.2
+          completion_params: {}
           mode: chat
-          name: gpt-4o-mini
-          provider: langgenius/openai/openai
+          name: qwq-plus
+          provider: langgenius/tongyi/tongyi
         prompt_template:
         - edition_type: basic
+          id: 7daae08d-5d8e-4b29-b6f2-9599eb0e7d30
           role: system
-          text: |
-            You are the dedicated AI4SEC threat modeling engine for ArchitectureID 1437.
-            Build a single JSON object only.
+          text: 'You are a security architect expert. Build a threat model using BOTH
+            TARA and STRIDE from the architecture context.
 
-            Mandatory rules:
-            1. The methodology value MUST be exactly TARA+STRIDE.
-            2. Use only facts grounded in the MCP response JSON. Do not fabricate assets, controls, or observables that are unsupported by the evidence.
-            3. Keep all object names and descriptions in English.
-            4. detection_indicators[].indicator.pattern_type MUST be exactly EQL when you emit detection indicators.
-            5. simulated_attack_paths[].path_steps must be natural-language sentence strings in the style:
-               when <preconditions>, <subject> <predicate> <object>, lead to <result>.
-            6. Return the schema-complete JSON even when some arrays are empty.
-            7. Avoid duplicate objects or semantically duplicated items across sections.
-            8. If the optional analysis focus is present, reflect it in threat_scenarios and security_goals.
+
+
+            Architecture Context:
+
+            MCP response JSON
+
+
+
+            Important rules:
+
+            1) Return a SINGLE JSON object only (no markdown, no commentary).
+
+            2) Keep all meaningful information; do not drop fields when uncertain.
+
+            3) For every indicator, pattern_type MUST be exactly \"EQL\".
+
+            4) simulated_attack_paths.path_steps MUST be natural-language sentence
+            list with style:
+
+               \"when <preconditions>, <subject_observable_id> <predicate> <object_observable_id>,
+            lead to <result>.\"
+
+            5) Report names must be semantic (never numbered templates).
+
+            6) Do NOT output top-level ttps. Merge kill-chain analysis into tara_stride_outputs.threat_scenarios.
+
+            7) Avoid semantic duplicates across arrays.
+
+            8) Keep object name and description concise, avoid unnecessary verbosity.
+
+            9) Include a top-level summary object with integer counts for each output
+            array and total_objects.
+
+            10) Every object name and description MUST be English-only text.
+
+            11) Do not output duplicate keys, duplicate arrays, or duplicate objects
+            across sections.
+
+            12) Do not include excessive blank lines; output compact JSON only.
+
+            13) Every object name/description must be business-specific and reference
+            concrete architecture entities, parameters, or attack intent (avoid generic
+            placeholders).
+
+            14) Do NOT output tara_stride_outputs.stride_mapping; embed STRIDE semantics
+            into attack_patterns.stride and threat_scenarios only.
+
+            15) Every observable type MUST be STIX 2.1 SCO type only (e.g., software,
+            process, file, ipv4-addr, domain-name, url, artifact). Never output types
+            like application/service/server/device/parameter.
+
+            16) Identify value assets ONLY when evidenced by architecture context/components/assets;
+            do not invent assets.
+
+            17) For each targets item include intrinsic value fields: intrinsic_value
+            (low/medium/high/critical), intrinsic_value_dimensions (subset of confidentiality/integrity/availability/physical_safety),
+            and intrinsic_value_reason.'
         - edition_type: basic
+          id: 39413144-b738-4647-9944-3c47fafbdc15
           role: user
-          text: |
-            Produce the final threat model from this OpenCTI MCP response.
+          text: 'Produce the final threat model from this OpenCTI MCP response.
+
 
             Optional analysis focus:
+
             {{#start_node.analysis_focus#}}
 
+
             MCP response JSON:
-            {{#query_threat_model_report.body#}}
+
+            {{#query_threat_model_report.response_json#}}
+
+            '
         reasoning_format: separated
+        selected: true
         structured_output:
           schema:
             additionalProperties: false
@@ -497,8 +908,7 @@ workflow:
         type: llm
         vision:
           enabled: false
-        selected: false
-      height: 84
+      height: 88
       id: llm_threat_model
       position:
         x: 950
@@ -506,51 +916,36 @@ workflow:
       positionAbsolute:
         x: 950
         y: 126
+      selected: true
       sourcePosition: right
       targetPosition: left
       type: custom
-      width: 260
+      width: 242
     - data:
-        code: |
-          import json
-          import urllib.parse
-
-          def main(response_json: str, analysis_json_raw: str) -> dict:
-              # // @ArchitectureID: 1436
-              payload = json.loads(response_json)
-              matched_report = payload.get("matched_report") or {}
-              
-              # Strip possible Markdown fences from LLM raw JSON output
-              clean_json = analysis_json_raw.strip()
-              if clean_json.startswith('```json'):
-                  clean_json = clean_json[7:]
-              elif clean_json.startswith('```'):
-                  clean_json = clean_json[3:]
-              if clean_json.endswith('```'):
-                  clean_json = clean_json[:-3]
-              clean_json = clean_json.strip()
-              
-              analysis = json.loads(clean_json)
-              analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2)
-              download_uri = "data:application/json;charset=utf-8," + urllib.parse.quote(analysis_json)
-              summary = analysis.get("summary") or {}
-              return {
-                  "report_name": str(matched_report.get("report_name") or ""),
-                  "report_id": str(matched_report.get("report_id") or ""),
-                  "match_strategy": str(matched_report.get("match_strategy") or "unknown"),
-                  "download_filename": str(payload.get("download_filename") or "threat-model.json"),
-                  "analysis_json": analysis_json,
-                  "download_markdown": f"[下载 JSON 结果]({download_uri})",
-                  "summary_text": (
-                      f"Generated {summary.get('attack_patterns', 0)} attack patterns, "
-                      f"{summary.get('course_of_actions', 0)} mitigations, "
-                      f"{summary.get('threat_scenarios', 0)} threat scenarios, and "
-                      f"{summary.get('detection_indicators', 0)} detection indicators."
-                  ),
-              }
+        code: "import json\nimport urllib.parse\n\ndef main(response_json: str, analysis_json_raw:\
+          \ str) -> dict:\n    # // @ArchitectureID: 1436\n    payload = json.loads(response_json)\n\
+          \    matched_report = payload.get(\"matched_report\") or {}\n    \n    #\
+          \ Strip possible Markdown fences from LLM raw JSON output\n    clean_json\
+          \ = analysis_json_raw.strip()\n    if clean_json.startswith('```json'):\n\
+          \        clean_json = clean_json[7:]\n    elif clean_json.startswith('```'):\n\
+          \        clean_json = clean_json[3:]\n    if clean_json.endswith('```'):\n\
+          \        clean_json = clean_json[:-3]\n    clean_json = clean_json.strip()\n\
+          \    \n    analysis = json.loads(clean_json)\n    analysis_json = json.dumps(analysis,\
+          \ ensure_ascii=False, indent=2)\n    download_uri = \"data:application/json;charset=utf-8,\"\
+          \ + urllib.parse.quote(analysis_json)\n    summary = analysis.get(\"summary\"\
+          ) or {}\n    return {\n        \"report_name\": str(matched_report.get(\"\
+          report_name\") or \"\"),\n        \"report_id\": str(matched_report.get(\"\
+          report_id\") or \"\"),\n        \"match_strategy\": str(matched_report.get(\"\
+          match_strategy\") or \"unknown\"),\n        \"download_filename\": str(payload.get(\"\
+          download_filename\") or \"threat-model.json\"),\n        \"analysis_json\"\
+          : analysis_json,\n        \"download_markdown\": f\"[下载 JSON 结果]({download_uri})\"\
+          ,\n        \"summary_text\": (\n            f\"Generated {summary.get('attack_patterns',\
+          \ 0)} attack patterns, \"\n            f\"{summary.get('course_of_actions',\
+          \ 0)} mitigations, \"\n            f\"{summary.get('threat_scenarios', 0)}\
+          \ threat scenarios, and \"\n            f\"{summary.get('detection_indicators',\
+          \ 0)} detection indicators.\"\n        ),\n    }\n"
         code_language: python3
         desc: ''
-        selected: false
         outputs:
           analysis_json:
             children: null
@@ -573,12 +968,13 @@ workflow:
           summary_text:
             children: null
             type: string
+        selected: false
         title: Format Threat Model Result
         type: code
         variables:
         - value_selector:
           - query_threat_model_report
-          - body
+          - response_json
           variable: response_json
         - value_selector:
           - llm_threat_model
@@ -595,30 +991,41 @@ workflow:
       sourcePosition: right
       targetPosition: left
       type: custom
-      width: 250
+      width: 242
     - data:
-        answer: |
-          已完成 VS1 威胁建模分析。
+        answer: '已完成 VS1 威胁建模分析。
+
 
           - 报告名称：{{#format_threat_model.report_name#}}
+
           - 报告 ID：{{#format_threat_model.report_id#}}
+
           - 匹配策略：{{#format_threat_model.match_strategy#}}
+
           - 下载文件名：{{#format_threat_model.download_filename#}}
+
           - 摘要：{{#format_threat_model.summary_text#}}
+
 
           {{#format_threat_model.download_markdown#}}
 
+
           结构化结果如下：
 
+
           ```json
+
           {{#format_threat_model.analysis_json#}}
+
           ```
+
+          '
         desc: ''
         selected: false
         title: Threat Model Output
         type: answer
         variables: []
-      height: 430
+      height: 309
       id: answer_threat_model
       position:
         x: 1580
@@ -629,9 +1036,9 @@ workflow:
       sourcePosition: right
       targetPosition: left
       type: custom
-      width: 260
+      width: 242
     viewport:
-      x: 68
-      y: 48
+      x: 22
+      y: 99
       zoom: 0.72
   rag_pipeline_variables: []

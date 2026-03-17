@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 ProjectionProfile = Literal["minimal", "summary", "analysis", "graph", "notification"]
-ThreatModelMatchStrategy = Literal["exact-id", "exact-name", "fuzzy-id", "fuzzy-name"]
+ThreatModelMatchStrategy = Literal["exact-id", "exact-name"]
 
 
 class QueryRequest(BaseModel):

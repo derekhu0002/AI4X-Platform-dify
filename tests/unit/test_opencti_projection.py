@@ -430,19 +430,22 @@ def test_threat_model_report_query_exact_name_returns_filtered_bundle() -> None:
     assert response.matched_report.report_name == "vs1-payment-threat-model"
     assert response.download_filename == "vs1-payment-threat-model-threat-model.json"
     assert response.analysis_input["methodology"] == "TARA+STRIDE"
+    assert "bundle" not in response.analysis_input
+    assert "architecture_description" not in response.analysis_input
     assert response.bundle["objects"][0]["type"] == "report"
 
 
-def test_threat_model_report_query_fuzzy_fallback_prefers_report_name() -> None:
+def test_threat_model_report_query_rejects_non_exact_partial_name() -> None:
     import asyncio
 
     settings = OpenCTIMCPSettings(mock_mode=True)
     service = OpenCTIProjectionService(settings)
 
-    response = asyncio.run(service.query_threat_model_report(ThreatModelReportQueryRequest(report_ref="payment threat")))
+    with pytest.raises(MCPContractError) as error:
+        asyncio.run(service.query_threat_model_report(ThreatModelReportQueryRequest(report_ref="payment threat")))
 
-    assert response.matched_report.match_strategy == "fuzzy-name"
-    assert response.matched_report.report_id.startswith("report--")
+    assert error.value.code == "CTI-4041"
+    assert "exact ID/name lookup" in error.value.message
 
 
 def test_threat_model_report_query_filters_out_opencti_specific_fields() -> None:
@@ -512,13 +515,19 @@ def test_threat_model_report_query_live_mode_prefers_exact_name() -> None:
         ],
     }
 
-    async def fake_list_live_reports() -> list[LiveReportCandidate]:
-        return [candidate]
+    async def fake_query_live_report_by_id(_: str) -> LiveReportCandidate | None:
+        return None
+
+    async def fake_query_live_report_by_exact_name(report_name: str) -> LiveReportCandidate | None:
+        if report_name == "vs4-bola-monitoring-rule":
+            return candidate
+        return None
 
     async def fake_fetch_live_threat_model_bundle(_: LiveReportCandidate) -> dict[str, object]:
         return bundle
 
-    service._list_live_reports = fake_list_live_reports  # type: ignore[method-assign]
+    service._query_live_report_by_id = fake_query_live_report_by_id  # type: ignore[method-assign]
+    service._query_live_report_by_exact_name = fake_query_live_report_by_exact_name  # type: ignore[method-assign]
     service._fetch_live_threat_model_bundle = fake_fetch_live_threat_model_bundle  # type: ignore[method-assign]
 
     response = asyncio.run(service.query_threat_model_report(ThreatModelReportQueryRequest(report_ref="vs4-bola-monitoring-rule")))
@@ -568,13 +577,19 @@ def test_threat_model_report_query_live_mode_can_resolve_local_source_report_id_
         ],
     }
 
-    async def fake_list_live_reports() -> list[LiveReportCandidate]:
-        return [candidate]
+    async def fake_query_live_report_by_id(_: str) -> LiveReportCandidate | None:
+        return None
+
+    async def fake_query_live_report_by_exact_name(report_name: str) -> LiveReportCandidate | None:
+        if report_name == "vs4-bola-monitoring-rule":
+            return candidate
+        return None
 
     async def fake_fetch_live_threat_model_bundle(_: LiveReportCandidate) -> dict[str, object]:
         return bundle
 
-    service._list_live_reports = fake_list_live_reports  # type: ignore[method-assign]
+    service._query_live_report_by_id = fake_query_live_report_by_id  # type: ignore[method-assign]
+    service._query_live_report_by_exact_name = fake_query_live_report_by_exact_name  # type: ignore[method-assign]
     service._fetch_live_threat_model_bundle = fake_fetch_live_threat_model_bundle  # type: ignore[method-assign]
     service._resolve_report_name_from_local_bundles = lambda report_ref: "vs4-bola-monitoring-rule" if report_ref == "report--cdd45eb6-f1cd-4f17-82b3-ac4bc03fcd58" else None  # type: ignore[method-assign]
 
@@ -588,3 +603,58 @@ def test_threat_model_report_query_live_mode_can_resolve_local_source_report_id_
     assert response.matched_report.match_strategy == "exact-name"
     assert response.matched_report.report_name == "vs4-bola-monitoring-rule"
     assert response.download_filename == "vs4-bola-monitoring-rule-threat-model.json"
+
+
+def test_threat_model_report_query_live_mode_prefers_exact_id_before_name() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=False)
+    service = OpenCTIProjectionService(settings)
+    candidate = LiveReportCandidate(
+        internal_id="878f5917-efdf-4ed5-b67a-543ad08f518a",
+        report_id="report--6e192237-550f-5a7e-be12-fc5e72419407",
+        report_name="vs4-bola-monitoring-rule",
+        description="Design-risk-to-monitoring evidence for the BOLA scenario.",
+        published="2026-03-14T12:00:00.000Z",
+    )
+    bundle = {
+        "type": "bundle",
+        "id": "bundle--live-standard-id",
+        "objects": [
+            {
+                "type": "report",
+                "spec_version": "2.1",
+                "id": "report--6e192237-550f-5a7e-be12-fc5e72419407",
+                "name": "vs4-bola-monitoring-rule",
+                "description": "Design-risk-to-monitoring evidence for the BOLA scenario.",
+                "published": "2026-03-14T12:00:00.000Z",
+                "report_types": ["threat-report"],
+                "object_refs": [],
+            }
+        ],
+    }
+
+    async def fake_query_live_report_by_id(report_ref: str) -> LiveReportCandidate | None:
+        if report_ref == "report--cdd45eb6-f1cd-4f17-82b3-ac4bc03fcd58":
+            return candidate
+        return None
+
+    async def fake_query_live_report_by_exact_name(_: str) -> LiveReportCandidate | None:
+        raise AssertionError("exact-name lookup should not run when exact-id succeeds")
+
+    async def fake_fetch_live_threat_model_bundle(_: LiveReportCandidate) -> dict[str, object]:
+        return bundle
+
+    service._query_live_report_by_id = fake_query_live_report_by_id  # type: ignore[method-assign]
+    service._query_live_report_by_exact_name = fake_query_live_report_by_exact_name  # type: ignore[method-assign]
+    service._fetch_live_threat_model_bundle = fake_fetch_live_threat_model_bundle  # type: ignore[method-assign]
+
+    response = asyncio.run(
+        service.query_threat_model_report(
+            ThreatModelReportQueryRequest(report_ref="report--cdd45eb6-f1cd-4f17-82b3-ac4bc03fcd58")
+        )
+    )
+
+    assert response.source == "opencti"
+    assert response.matched_report.match_strategy == "exact-id"
+    assert response.matched_report.report_id == "report--6e192237-550f-5a7e-be12-fc5e72419407"

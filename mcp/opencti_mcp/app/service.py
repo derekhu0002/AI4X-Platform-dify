@@ -5,7 +5,6 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
-from difflib import SequenceMatcher
 import time
 from typing import Any
 
@@ -289,16 +288,106 @@ class OpenCTIProjectionService:
         report_ref: str,
     ) -> tuple[ThreatModelReportMatch, dict[str, Any]]:
         """// @ArchitectureID: 1215"""
-        candidates = await self._list_live_reports()
-        matched_report, candidate = self._match_live_report_candidate(candidates, report_ref)
+        matched_report, candidate = await self._resolve_live_report_candidate(report_ref)
         bundle = await self._fetch_live_threat_model_bundle(candidate)
         return matched_report, bundle
 
-    async def _list_live_reports(self) -> list[LiveReportCandidate]:
+    async def _resolve_live_report_candidate(
+        self,
+        report_ref: str,
+    ) -> tuple[ThreatModelReportMatch, LiveReportCandidate]:
+        """// @ArchitectureID: 1215"""
+        normalized_ref = self._normalize_match_text(report_ref)
+        candidate = await self._query_live_report_by_id(report_ref)
+        if candidate is not None:
+            return (
+                ThreatModelReportMatch(
+                    report_id=candidate.report_id,
+                    report_name=candidate.report_name,
+                    match_strategy="exact-id",
+                ),
+                candidate,
+            )
+
+        if normalized_ref.startswith("report--"):
+            alias_name = self._resolve_report_name_from_local_bundles(report_ref)
+            if alias_name and self._normalize_match_text(alias_name) != normalized_ref:
+                alias_candidate = await self._query_live_report_by_exact_name(alias_name)
+                if alias_candidate is not None:
+                    return (
+                        ThreatModelReportMatch(
+                            report_id=alias_candidate.report_id,
+                            report_name=alias_candidate.report_name,
+                            match_strategy="exact-name",
+                        ),
+                        alias_candidate,
+                    )
+
+        candidate = await self._query_live_report_by_exact_name(report_ref)
+        if candidate is not None:
+            return (
+                ThreatModelReportMatch(
+                    report_id=candidate.report_id,
+                    report_name=candidate.report_name,
+                    match_strategy="exact-name",
+                ),
+                candidate,
+            )
+
+        raise MCPContractError(
+            "CTI-4041",
+            f"No report matched '{report_ref}' after exact ID/name lookup.",
+            status_code=404,
+        )
+
+    async def _query_live_report_by_id(self, report_ref: str) -> LiveReportCandidate | None:
         """// @ArchitectureID: 1215"""
         query = """
-        query ListReports($first: Int!) {
-          reports(first: $first) {
+        query ReportById($id: String!) {
+          stixCoreObject(id: $id) {
+            id
+            standard_id
+            entity_type
+            ... on Report {
+              name
+              description
+              published
+            }
+          }
+        }
+        """
+        payload = await self._post_graphql(
+            query=query,
+            variables={"id": report_ref},
+            operation_name="stixCoreObject",
+        )
+        node = payload.get("data", {}).get("stixCoreObject")
+        if not node:
+            return None
+        if str(node.get("entity_type") or "").lower() != "report":
+            return None
+        internal_id = str(node.get("id") or "")
+        report_id = str(node.get("standard_id") or "")
+        report_name = str(node.get("name") or "")
+        if not internal_id or not report_id or not report_name:
+            return None
+        return LiveReportCandidate(
+            internal_id=internal_id,
+            report_id=report_id,
+            report_name=report_name,
+            description=str(node.get("description") or ""),
+            published=str(node.get("published") or ""),
+        )
+
+    async def _query_live_report_by_exact_name(self, report_name: str) -> LiveReportCandidate | None:
+        """// @ArchitectureID: 1215"""
+        normalized_name = self._normalize_match_text(report_name)
+        if not normalized_name:
+            return None
+
+        query = """
+        query ReportByExactName($filters: FilterGroup, $first: Int!) {
+          reports(filters: $filters, first: $first) {
             edges {
               node {
                 id
@@ -313,138 +402,53 @@ class OpenCTIProjectionService:
         """
         payload = await self._post_graphql(
             query=query,
-            variables={"first": 100},
+            variables={
+                "first": 2,
+                "filters": {
+                    "mode": "and",
+                    "filterGroups": [],
+                    "filters": [
+                        {
+                            "key": "name",
+                            "values": [report_name],
+                            "operator": "eq",
+                            "mode": "or",
+                        }
+                    ],
+                },
+            },
             operation_name="reports",
         )
         edges = payload.get("data", {}).get("reports", {}).get("edges", [])
-        candidates: list[LiveReportCandidate] = []
+        exact_candidates: list[LiveReportCandidate] = []
         for edge in edges:
             node = edge.get("node") or {}
             internal_id = str(node.get("id") or "")
             report_id = str(node.get("standard_id") or "")
-            report_name = str(node.get("name") or "")
-            if not internal_id or not report_id or not report_name:
+            candidate_name = str(node.get("name") or "")
+            if not internal_id or not report_id or not candidate_name:
                 continue
-            candidates.append(
+            if self._normalize_match_text(candidate_name) != normalized_name:
+                continue
+            exact_candidates.append(
                 LiveReportCandidate(
                     internal_id=internal_id,
                     report_id=report_id,
-                    report_name=report_name,
+                    report_name=candidate_name,
                     description=str(node.get("description") or ""),
                     published=str(node.get("published") or ""),
                 )
             )
 
-        if not candidates:
-            raise MCPContractError("CTI-4041", "No report object was found in OpenCTI.", status_code=404)
-        return candidates
-
-    def _match_live_report_candidate(
-        self,
-        candidates: list[LiveReportCandidate],
-        report_ref: str,
-    ) -> tuple[ThreatModelReportMatch, LiveReportCandidate]:
-        """// @ArchitectureID: 1215"""
-        normalized_ref = self._normalize_match_text(report_ref)
-        for candidate in candidates:
-            if normalized_ref in {
-                self._normalize_match_text(candidate.internal_id),
-                self._normalize_match_text(candidate.report_id),
-            }:
-                return (
-                    ThreatModelReportMatch(
-                        report_id=candidate.report_id,
-                        report_name=candidate.report_name,
-                        match_strategy="exact-id",
-                    ),
-                    candidate,
-                )
-            if normalized_ref == self._normalize_match_text(candidate.report_name):
-                return (
-                    ThreatModelReportMatch(
-                        report_id=candidate.report_id,
-                        report_name=candidate.report_name,
-                        match_strategy="exact-name",
-                    ),
-                    candidate,
-                )
-
-        if normalized_ref.startswith("report--"):
-            alias_name = self._resolve_report_name_from_local_bundles(report_ref)
-            if alias_name and self._normalize_match_text(alias_name) != normalized_ref:
-                for candidate in candidates:
-                    if self._normalize_match_text(candidate.report_name) == self._normalize_match_text(alias_name):
-                        return (
-                            ThreatModelReportMatch(
-                                report_id=candidate.report_id,
-                                report_name=candidate.report_name,
-                                match_strategy="exact-name",
-                            ),
-                            candidate,
-                        )
-
-        matched = self._score_live_report_candidates(candidates, normalized_ref)
-        if matched is None:
-            alias_name = self._resolve_report_name_from_local_bundles(report_ref)
-            if alias_name and self._normalize_match_text(alias_name) != normalized_ref:
-                matched = self._score_live_report_candidates(candidates, self._normalize_match_text(alias_name))
-                if matched is not None:
-                    strategy, candidate = matched
-                    exact_strategy = "exact-name" if strategy == "fuzzy-name" else strategy
-                    return (
-                        ThreatModelReportMatch(
-                            report_id=candidate.report_id,
-                            report_name=candidate.report_name,
-                            match_strategy=exact_strategy,
-                        ),
-                        candidate,
-                    )
+        if not exact_candidates:
+            return None
+        if len(exact_candidates) > 1:
             raise MCPContractError(
-                "CTI-4041",
-                f"No report matched '{report_ref}' after exact and fuzzy lookup.",
-                status_code=404,
+                "CTI-4091",
+                f"Report name '{report_name}' matched multiple exact OpenCTI reports.",
+                status_code=409,
             )
-
-        strategy, candidate = matched
-        return (
-            ThreatModelReportMatch(
-                report_id=candidate.report_id,
-                report_name=candidate.report_name,
-                match_strategy=strategy,
-            ),
-            candidate,
-        )
-
-    def _score_live_report_candidates(
-        self,
-        candidates: list[LiveReportCandidate],
-        normalized_ref: str,
-    ) -> tuple[str, LiveReportCandidate] | None:
-        """// @ArchitectureID: 1215"""
-        scored_candidates: list[tuple[float, str, LiveReportCandidate]] = []
-        for candidate in candidates:
-            scored_candidates.append(
-                (
-                    self._score_fuzzy_match(normalized_ref, self._normalize_match_text(candidate.report_id)),
-                    "fuzzy-id",
-                    candidate,
-                )
-            )
-            scored_candidates.append(
-                (
-                    self._score_fuzzy_match(normalized_ref, self._normalize_match_text(candidate.report_name)),
-                    "fuzzy-name",
-                    candidate,
-                )
-            )
-
-        if not scored_candidates:
-            return None
-
-        best_score, strategy, candidate = max(scored_candidates, key=lambda item: item[0])
-        if best_score < 0.35:
-            return None
-        return strategy, candidate
+        return exact_candidates[0]
 
     def _resolve_report_name_from_local_bundles(self, report_ref: str) -> str | None:
         """// @ArchitectureID: 1215"""
@@ -801,39 +805,16 @@ class OpenCTIProjectionService:
                     match_strategy="exact-name",
                 )
 
-        scored_candidates: list[tuple[float, str, dict[str, Any]]] = []
-        for report in reports:
-            report_id = str(report.get("id", ""))
-            report_name = str(report.get("name", ""))
-            scored_candidates.append((self._score_fuzzy_match(normalized_ref, self._normalize_match_text(report_id)), "fuzzy-id", report))
-            scored_candidates.append((self._score_fuzzy_match(normalized_ref, self._normalize_match_text(report_name)), "fuzzy-name", report))
-
-        best_score, strategy, best_report = max(scored_candidates, key=lambda item: item[0])
-        if best_score < 0.35:
-            raise MCPContractError(
-                "CTI-4041",
-                f"No report matched '{report_ref}' after exact and fuzzy lookup.",
-                status_code=404,
-            )
-
-        return ThreatModelReportMatch(
-            report_id=str(best_report.get("id", "")),
-            report_name=str(best_report.get("name", "")),
-            match_strategy=strategy,
+        raise MCPContractError(
+            "CTI-4041",
+            f"No report matched '{report_ref}' after exact ID/name lookup.",
+            status_code=404,
         )
 
     def _normalize_match_text(self, value: str) -> str:
         """// @ArchitectureID: 1215"""
         compact = re.sub(r"\s+", " ", value or "").strip().lower()
         return compact
-
-    def _score_fuzzy_match(self, query: str, candidate: str) -> float:
-        """// @ArchitectureID: 1215"""
-        if not query or not candidate:
-            return 0.0
-        if query in candidate or candidate in query:
-            return 1.0
-        return SequenceMatcher(None, query, candidate).ratio()
 
     def _build_threat_model_bundle(self, bundle: dict[str, Any], report_id: str) -> dict[str, Any]:
         """// @ArchitectureID: 1215"""
@@ -916,8 +897,6 @@ class OpenCTIProjectionService:
             },
             "components": components,
             "assets": assets,
-            "bundle": bundle,
-            "architecture_description": json.dumps(bundle, ensure_ascii=False),
         }
 
     def _build_download_filename(self, report_name: str) -> str:
