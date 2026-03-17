@@ -1,0 +1,13 @@
+{
+  "description": "STIX 2.1 minimal field matrix for AI4SEC runtime writeback validation.",
+  "matrix": {
+    "indicator": ["id", "type", "pattern", "pattern_type", "valid_from"],
+    "vulnerability": ["id", "type", "name"],
+    "incident": ["id", "type", "name"],
+    "attack-pattern": ["id", "type", "name"],
+    "grouping": ["id", "type", "name", "object_refs"],
+    "note": ["id", "type", "content", "object_refs"],
+    "opinion": ["id", "type", "opinion", "object_refs"],
+    "relationship": ["id", "type", "relationship_type", "source_ref", "target_ref"]
+  }
+}

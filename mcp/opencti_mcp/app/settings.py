@@ -17,6 +17,8 @@ class OpenCTIMCPSettings(BaseSettings):
     vs2_object_id: str = ""
     vs3_object_id: str = ""
     vs4_object_id: str = ""
+    stix_minimal_field_matrix_path: str = "config/stix_minimal_field_matrix.json"
+    writeback_verify_window_seconds: float = 1.0
 
     model_config = SettingsConfigDict(
         env_prefix="OPENCTI_MCP_",

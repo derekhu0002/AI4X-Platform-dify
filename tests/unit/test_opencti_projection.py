@@ -1,5 +1,5 @@
 from mcp.opencti_mcp.app.models import QueryRequest
-from mcp.opencti_mcp.app.service import OpenCTIProjectionService
+from mcp.opencti_mcp.app.service import MCPContractError, OpenCTIProjectionService
 from mcp.opencti_mcp.app.settings import OpenCTIMCPSettings
 import httpx
 import pytest
@@ -253,6 +253,66 @@ def test_query_disables_environment_proxy_in_httpx_client() -> None:
     assert DummyAsyncClient.captured_init_kwargs["trust_env"] is False
 
 
+def test_write_bundle_rejects_missing_minimal_fields() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=True)
+    service = OpenCTIProjectionService(settings)
+
+    from mcp.opencti_mcp.app import models as model_module
+    from mcp.opencti_mcp.app import service as service_module
+
+    request = model_module.BundleWriteRequest(
+        bundle={
+            "type": "bundle",
+            "objects": [
+                {
+                    "id": "indicator--vs4",
+                    "type": "indicator",
+                    "pattern_type": "stix",
+                    "valid_from": "2026-03-16T00:00:00Z",
+                }
+            ],
+        },
+        dry_run=True,
+    )
+
+    with pytest.raises(service_module.MCPContractError) as error:
+        asyncio.run(service.write_bundle(request))
+
+    assert error.value.code == "MCP-4006"
+    assert "pattern" in error.value.message
+
+
+def test_write_bundle_accepts_minimal_fields_in_dry_run() -> None:
+    import asyncio
+
+    settings = OpenCTIMCPSettings(mock_mode=True)
+    service = OpenCTIProjectionService(settings)
+
+    from mcp.opencti_mcp.app.models import BundleWriteRequest
+
+    request = BundleWriteRequest(
+        bundle={
+            "type": "bundle",
+            "objects": [
+                {
+                    "id": "indicator--vs4",
+                    "type": "indicator",
+                    "pattern": "[ipv4-addr:value = '10.0.0.1']",
+                    "pattern_type": "stix",
+                    "valid_from": "2026-03-16T00:00:00Z",
+                }
+            ],
+        },
+        dry_run=True,
+    )
+
+    response = asyncio.run(service.write_bundle(request))
+    assert response.accepted is True
+    assert response.mode == "dry-run"
+
+
 def test_query_uses_incident_vs2_alias_for_live_opencti_lookup_and_context() -> None:
     import asyncio
 
@@ -327,3 +387,31 @@ def test_query_uses_incident_vs2_alias_for_live_opencti_lookup_and_context() -> 
     assert response.items[0]["priority"] == "P2"
     assert response.items[0]["owner_team"] == "secops-team"
     assert response.items[0]["standard_id"] == settings.vs2_object_id
+
+
+def test_probe_classifies_missing_import_mutation() -> None:
+    settings = OpenCTIMCPSettings(mock_mode=False)
+    service = OpenCTIProjectionService(settings)
+    error = MCPContractError(
+        "CTI-5023",
+        'OpenCTI GraphQL returned an application error in probe_importPush: Cannot query field "importPush" on type "Mutation".',
+        status_code=502,
+    )
+
+    result = service._classify_probe_error(error)
+    assert result["status"] == "blocked"
+    assert result["code"] == "CTI-5024"
+
+
+def test_probe_classifies_token_permission_issue() -> None:
+    settings = OpenCTIMCPSettings(mock_mode=False)
+    service = OpenCTIProjectionService(settings)
+    error = MCPContractError(
+        "CTI-5023",
+        "OpenCTI GraphQL returned an application error in probe_importPush: GraphQL introspection not authorized!",
+        status_code=502,
+    )
+
+    result = service._classify_probe_error(error)
+    assert result["status"] == "blocked"
+    assert result["code"] == "CTI-AUTH1"

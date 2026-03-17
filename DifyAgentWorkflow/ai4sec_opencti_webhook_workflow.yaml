@@ -1,0 +1,283 @@
+app:
+  description: Dedicated webhook-only workflow for OpenCTI signal bundle ingress.
+  icon: W
+  icon_background: '#E9F2FF'
+  mode: workflow
+  name: AI4SEC OpenCTI Webhook Workflow
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - description: ''
+    id: webhook-opencti-url
+    name: OPENCTI_MCP_URL
+    selector:
+    - env
+    - OPENCTI_MCP_URL
+    value: http://host.docker.internal:8101
+    value_type: string
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: trigger-webhook
+        targetType: code
+      id: edge-trigger-normalize
+      source: webhook-trigger
+      sourceHandle: source
+      target: normalize_webhook
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: http-request
+      id: edge-normalize-query
+      source: normalize_webhook
+      sourceHandle: source
+      target: query_opencti
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: code
+      id: edge-query-build-answer
+      source: query_opencti
+      sourceHandle: source
+      target: build_response
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: code
+        targetType: answer
+      id: edge-build-answer
+      source: build_response
+      sourceHandle: source
+      target: answer-webhook
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        async_mode: true
+        body: []
+        content_type: application/json
+        desc: ''
+        headers: []
+        method: POST
+        params: []
+        response_body: ''
+        selected: false
+        status_code: 200
+        title: Webhook 触发器
+        type: trigger-webhook
+        variables:
+        - label: raw
+          required: true
+          value_selector: []
+          value_type: object
+          variable: _webhook_raw
+        webhook_debug_url: ''
+        webhook_url: ''
+      height: 130
+      id: webhook-trigger
+      position:
+        x: 30
+        y: 120
+      positionAbsolute:
+        x: 30
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef _extract_bundle_from_dify_webhook(raw_payload: object) -> dict:\n    # @ArchitectureID: 1214\n    \"\"\"\n    Extract STIX bundle from Dify webhook context.\n    Dify webhook trigger wraps request in {body, headers, method, ...} structure.\n    Target bundle is in raw_payload['body'] or raw_payload itself.\n    \"\"\"\n    if not isinstance(raw_payload, dict):\n        raise ValueError('Webhook payload must be a dict object.')\n    \n    # Try to extract from Dify webhook structure first\n    bundle_candidate = raw_payload.get('body')\n    if bundle_candidate is None:\n        # Fallback: treat entire payload as bundle (direct mode)\n        bundle_candidate = raw_payload\n    \n    # Coerce string JSON to dict if needed\n    if isinstance(bundle_candidate, str):\n        bundle = json.loads(bundle_candidate)\n    elif isinstance(bundle_candidate, dict):\n        bundle = bundle_candidate\n    else:\n        raise ValueError('Webhook body must contain a valid STIX bundle object.')\n    \n    return bundle\n\n\ndef main(raw_payload: object) -> dict:\n    bundle = _extract_bundle_from_dify_webhook(raw_payload)\n    objects = bundle.get('objects') or []\n    if not objects:\n        raise ValueError(f'Webhook bundle {bundle.get(\"id\")} must contain at least one STIX object.')\n\n    signal = objects[0]\n    lookup_id = str(signal.get('x_opencti_id') or signal.get('id') or '').strip()\n    if not lookup_id:\n        raise ValueError('Webhook signal does not contain lookup id.')\n\n    object_type = str(signal.get('type') or 'vulnerability').strip()\n    \n    # Derive flow by object type (webhook entry defaults to VS3)\n    if object_type == 'attack-pattern':\n        derived_flow = 'VS1'\n    elif object_type in {'incident', 'grouping'}:\n        derived_flow = 'VS2'\n    elif object_type == 'vulnerability':\n        derived_flow = 'VS3'\n    elif object_type == 'indicator':\n        derived_flow = 'VS4'\n    else:\n        derived_flow = 'VS3'\n\n    return {\n        'lookup_id': lookup_id,\n        'object_type': object_type,\n        'selected_flow': derived_flow,\n        'bundle_id': str(bundle.get('id') or ''),\n        'user_request': f'来自 OpenCTI webhook 的 {object_type} 信号：{lookup_id}',\n    }\n"
+        code_language: python3
+        desc: ''
+        outputs:
+          bundle_id:
+            children: null
+            type: string
+          lookup_id:
+            children: null
+            type: string
+          object_type:
+            children: null
+            type: string
+          selected_flow:
+            children: null
+            type: string
+          user_request:
+            children: null
+            type: string
+        selected: false
+        title: Normalize Webhook Bundle
+        type: code
+        variables:
+        - value_selector:
+          - webhook-trigger
+          - _webhook_raw
+          variable: raw_payload
+      height: 54
+      id: normalize_webhook
+      position:
+        x: 324
+        y: 120
+      positionAbsolute:
+        x: 324
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - type: text
+            value: '{"object_id":"{{#normalize_webhook.lookup_id#}}","object_type":"{{#normalize_webhook.object_type#}}","projection_profile":"notification","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":false}'
+          type: json
+        desc: ''
+        headers: ''
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          connect: 10
+          max_connect_timeout: 10
+          max_read_timeout: 600
+          max_write_timeout: 600
+          read: 600
+          write: 600
+        title: Query OpenCTI MCP
+        type: http-request
+        url: '{{#env.OPENCTI_MCP_URL#}}/query'
+        variables: []
+      height: 142
+      id: query_opencti
+      position:
+        x: 626
+        y: 120
+      positionAbsolute:
+        x: 626
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\n\ndef main(response_json: str, selected_flow: str, lookup_id: str, bundle_id: str) -> dict:\n    # @ArchitectureID: 1214\n    payload = json.loads(response_json)\n    item = (payload.get('items') or [{}])[0]\n    return {\n        'scene_type': str(item.get('scene_type') or selected_flow),\n        'severity': str(item.get('severity') or 'unknown'),\n        'task_status': str(item.get('task_status') or '待处理'),\n        'name': str(item.get('name') or lookup_id),\n        'lookup_id': lookup_id,\n        'bundle_id': bundle_id or 'unknown-bundle',\n    }\n"
+        code_language: python3
+        desc: ''
+        outputs:
+          bundle_id:
+            children: null
+            type: string
+          lookup_id:
+            children: null
+            type: string
+          name:
+            children: null
+            type: string
+          scene_type:
+            children: null
+            type: string
+          severity:
+            children: null
+            type: string
+          task_status:
+            children: null
+            type: string
+        selected: false
+        title: Build Webhook Response
+        type: code
+        variables:
+        - value_selector:
+          - query_opencti
+          - body
+          variable: response_json
+        - value_selector:
+          - normalize_webhook
+          - selected_flow
+          variable: selected_flow
+        - value_selector:
+          - normalize_webhook
+          - lookup_id
+          variable: lookup_id
+        - value_selector:
+          - normalize_webhook
+          - bundle_id
+          variable: bundle_id
+      height: 54
+      id: build_response
+      position:
+        x: 930
+        y: 120
+      positionAbsolute:
+        x: 930
+        y: 120
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        answer: 'Webhook 已受理。\n\n- Bundle ID：{{#build_response.bundle_id#}}\n- Lookup ID：{{#build_response.lookup_id#}}\n- 场景：{{#build_response.scene_type#}}\n- 对象：{{#build_response.name#}}\n- 严重度：{{#build_response.severity#}}\n- 当前状态：{{#build_response.task_status#}}\n'
+        desc: ''
+        selected: false
+        title: Webhook Output
+        type: answer
+        variables: []
+      height: 220
+      id: answer-webhook
+      position:
+        x: 1235
+        y: 70
+      positionAbsolute:
+        x: 1235
+        y: 70
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    viewport:
+      x: 24
+      y: 38
+      zoom: 0.9
+  rag_pipeline_variables: []

@@ -68,3 +68,36 @@ def build_notification_payload(scene: str, stix_object: dict[str, Any]) -> dict[
         "severity_tier": "high",
         "event_type": f"ai4sec.{scene.lower()}.result.v1",
     }
+
+
+def ensure_human_review_gate(review_status: str | None) -> bool:
+    """// @ArchitectureID: 1214"""
+    return str(review_status or "").strip().lower() in {"approved", "pass", "confirmed", "通过"}
+
+
+def build_opencti_writeback_bundle(
+    stix_object: dict[str, Any],
+    review_status: str | None,
+    analyst_summary: str,
+) -> dict[str, Any]:
+    """// @ArchitectureID: 1214"""
+    if not ensure_human_review_gate(review_status):
+        raise PermissionError("Human review is required before final writeback.")
+
+    object_id = str(stix_object.get("id", ""))
+    if not object_id:
+        raise ValueError("Cannot write back without a STIX object id.")
+
+    note_id = f"note--{object_id.replace('--', '-')}-feedback"
+    return {
+        "type": "bundle",
+        "objects": [
+            {
+                "type": "note",
+                "id": note_id,
+                "content": analyst_summary,
+                "object_refs": [object_id],
+                "x_opencti_review_status": str(review_status or "approved"),
+            }
+        ],
+    }

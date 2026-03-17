@@ -1,36 +1,41 @@
-feat: complete business validation assets and harden MCP flow
+feat(ai4sec): deliver webhook ingress and OpenCTI real-data loop
 
-- Feature:
-  - add full business-layer manual validation pack under tests/validation, including capability summary, acceptance template, environment setup, and ten capability-specific validation guides
-  - add four STIX 2.1 validation bundles for VS1-VS4 under tests/validation/test-data to support OpenCTI import and end-to-end manual acceptance
-  - enrich validation guidance and task support docs, including completion checkboxes in implementation/taskhelpinfos/2026-3-14_请添加业务层的测试用例集.md
-- Fix:
-  - fix Dify workflow compatibility and VS1 routing in DifyAgentWorkflow/ai4sec_unified_workflow.yaml, including current-case structure updates and BL-03-01 keyword coverage for 建模结果/威胁结论/发布建议
-  - fix local MCP package resolution by adding package markers under mcp/, mcp/opencti_mcp/, and mcp/notification_mcp/
-  - harden OpenCTI MCP error handling in mcp/opencti_mcp/app/main.py, mcp/opencti_mcp/app/service.py, and mcp/opencti_mcp/app/settings.py with structured upstream error mapping, alias-to-real-ID resolution, schema-compatible GraphQL fields, and trust_env=False behavior
-  - improve notification/opencti regression coverage in tests/unit/test_opencti_projection.py, tests/unit/test_notification_service.py, tests/contract/test_opencti_api_contract.py, and tests/integration/test_webhook_to_notification_flow.py
-- Refactor:
-  - normalize MCP settings and service structure across notification and opencti apps to align runtime configuration loading and contract error behavior
-  - update design/tasks/taskandissues_for_LLM.md with resolver notes and verification state for the BusinessLayer 1208 work item
-- Build/Release:
-  - update .env.example and README.md to reflect current local runtime and iteration-delivery expectations
-  - ignore Python cache artifacts in .gitignore and remove tracked __pycache__ bytecode from version control
-- Drift/Unrelated:
-  - AI4X-Platform-dify.feap changed during the iteration but is not directly evidenced as part of the business validation or MCP fixes
+Feature:
+- add dedicated OpenCTI webhook workflow asset in DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml for signal normalization, query, and response chaining
+- introduce agent-side webhook ingress service under mcp/ai4sec_agent/app/main.py and mcp/ai4sec_agent/app/models.py
+- add closed-loop runtime helpers in DifyAgentWorkflow/tools/ai4sec_runtime_tools.py and corresponding unit coverage in tests/unit/test_runtime_tools_closed_loop.py
+- add STIX minimal field matrix config in config/stix_minimal_field_matrix.json and operator switch guide in external_opencti/opencti_webhook_agent_switch_guide.md
 
-- Files Changed:
-  - Workflow and routing: DifyAgentWorkflow/ai4sec_unified_workflow.yaml
-  - MCP runtime: mcp/opencti_mcp/app/main.py, mcp/opencti_mcp/app/service.py, mcp/opencti_mcp/app/settings.py, mcp/notification_mcp/app/service.py, mcp/notification_mcp/app/settings.py, mcp/**/__init__.py
-  - Tests: tests/unit/test_opencti_projection.py, tests/unit/test_notification_service.py, tests/contract/test_opencti_api_contract.py, tests/integration/test_webhook_to_notification_flow.py
-  - Validation assets: tests/validation/README.md, tests/validation/00-*.md, tests/validation/01-10*.md, tests/validation/test-data/*.json
-  - Planning and tracking: design/tasks/taskandissues_for_LLM.md, implementation/taskhelpinfos/2026-3-14_请添加业务层的测试用例集.md
-  - Repo hygiene: .gitignore
+Fix:
+- replace hardcoded mock object ids in DifyAgentWorkflow/ai4sec_unified_workflow.yaml with start-input variables for VS1/VS2/VS3/VS4 query nodes
+- fix Dify expression resolution by normalizing start node references (start_node) in DifyAgentWorkflow/ai4sec_unified_workflow.yaml and aligning tests/e2e/test_delivery_assets.py
+- harden OpenCTI MCP query/write behavior in mcp/opencti_mcp/app/service.py, mcp/opencti_mcp/app/main.py, and mcp/opencti_mcp/app/settings.py (schema compatibility, write-capability probing, error mapping)
+- expand regression and contract checks in tests/unit/test_opencti_projection.py and tests/contract/test_agent_webhook_contract.py
 
-- Risk Notes:
-  - BL-03-01 routing fix is statically validated in workflow YAML but still depends on re-import and live verification in the local Dify UI
-  - OpenCTI integration behavior depends on the local OpenCTI/Elasticsearch runtime being healthy when queries are executed
-  - the FEAP binary diff should be reviewed before commit to confirm it is intentional and not tooling drift
+Refactor:
+- update architecture and task traceability artifacts in design/KG/SystemArchitecture.json and design/tasks/taskandissues_for_LLM.md with iteration resolver context
+- reorganize implementation tracking docs in implementation/task-list.md and implementation/taskhelpinfos/index.md
 
-- Suggested Follow-ups:
-  - re-import the Dify workflow and execute the BL-03-01 sample request once in the UI to confirm live routing behavior
-  - review whether AI4X-Platform-dify.feap should be included in this iteration commit or split out as a separate change
+Build/Release:
+- update environment/runtime delivery metadata in externalDify/.env and AI4X-Platform-dify.feap
+
+Drift/Unrelated:
+- add temporary/debug artifacts debug/_tmp.txt and debug/ggg.yml
+- add screenshot artifacts Pasted image 20260317001921.png, Pasted image 20260317002010.png, and Pasted image 20260317002018.png
+
+Files Changed:
+- Workflow: DifyAgentWorkflow/ai4sec_unified_workflow.yaml, DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml
+- MCP services: mcp/ai4sec_agent/app/main.py, mcp/ai4sec_agent/app/models.py, mcp/opencti_mcp/app/main.py, mcp/opencti_mcp/app/service.py, mcp/opencti_mcp/app/settings.py
+- Tests: tests/e2e/test_delivery_assets.py, tests/unit/test_opencti_projection.py, tests/unit/test_runtime_tools_closed_loop.py, tests/contract/test_agent_webhook_contract.py
+- Config and docs: config/stix_minimal_field_matrix.json, design/tasks/taskandissues_for_LLM.md, design/KG/SystemArchitecture.json, external_opencti/opencti_webhook_agent_switch_guide.md, implementation/taskhelpinfos/*.md
+- Potential drift artifacts: debug/_tmp.txt, debug/ggg.yml, Pasted image 20260317001921.png, Pasted image 20260317002010.png, Pasted image 20260317002018.png, AI4X-Platform-dify.feap
+
+Risk Notes:
+- live Dify runtime still depends on valid opencti_object_id/object_type inputs for unified workflow query calls
+- OpenCTI write/query paths may vary by deployed schema capabilities and eventual consistency windows
+- drift artifacts and binary/project files may add commit noise unless intentionally included
+
+Suggested Follow-ups:
+- verify one live OpenCTI webhook trigger against DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml and confirm concrete object_id/object_type in query payload
+- verify one VS4 unified workflow run with known valid OpenCTI object id after import/publish
+- decide whether debug artifacts and pasted screenshots should be excluded from the release commit
