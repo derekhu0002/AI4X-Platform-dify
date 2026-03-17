@@ -8,7 +8,7 @@ def test_workflow_asset_contains_menu_and_intent_routing() -> None:
     workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
     assert workflow["kind"] == "app"
     nodes = {node["id"]: node for node in workflow["workflow"]["graph"]["nodes"]}
-    assert "start-node" in nodes
+    assert "start_node" in nodes
     assert nodes["route-intent"]["data"]["type"] == "if-else"
     assert workflow["metadata"]["webhook"]["auth_required"] is False
 
