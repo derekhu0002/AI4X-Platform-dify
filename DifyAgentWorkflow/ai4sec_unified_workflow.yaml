@@ -294,6 +294,16 @@ workflow:
           required: false
           type: text-input
           variable: notify_primary_recipient
+        - label: opencti_object_id
+          max_length: 256
+          required: false
+          type: text-input
+          variable: opencti_object_id
+        - label: opencti_object_type
+          max_length: 64
+          required: false
+          type: text-input
+          variable: opencti_object_type
       height: 161
       id: start-node
       position:
@@ -494,7 +504,7 @@ workflow:
         body:
           data:
           - type: text
-            value: '{"object_id":"attack-pattern--vs1","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
+            value: '{"object_id":"{{#start-node.opencti_object_id#}}","object_type":"{{#start-node.opencti_object_type#}}","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
           type: json
         desc: ''
         headers: ''
@@ -614,7 +624,7 @@ workflow:
         body:
           data:
           - type: text
-            value: '{"object_id":"incident--vs2","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
+            value: '{"object_id":"{{#start-node.opencti_object_id#}}","object_type":"{{#start-node.opencti_object_type#}}","projection_profile":"analysis","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
           type: json
         desc: ''
         headers: ''
@@ -733,7 +743,7 @@ workflow:
         body:
           data:
           - type: text
-            value: '{"object_id":"vulnerability--vs3","projection_profile":"notification","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":false}'
+            value: '{"object_id":"{{#start-node.opencti_object_id#}}","object_type":"{{#start-node.opencti_object_type#}}","projection_profile":"notification","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":false}'
           type: json
         desc: ''
         headers: ''
@@ -852,7 +862,7 @@ workflow:
         body:
           data:
           - type: text
-            value: '{"object_id":"indicator--vs4","projection_profile":"graph","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
+            value: '{"object_id":"{{#start-node.opencti_object_id#}}","object_type":"{{#start-node.opencti_object_type#}}","projection_profile":"graph","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":true,"relationship_depth":1}'
           type: json
         desc: ''
         headers: ''
