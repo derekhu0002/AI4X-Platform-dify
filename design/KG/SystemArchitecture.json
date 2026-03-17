@@ -126,7 +126,7 @@
 {
 "name": "将该MCP功模块替换成该工作流中的节点，所有功能通过节点来实现，不再使用该外部FASTAPI服务"
 ,"type": "ToDo"
-,"status": "Active"
+,"status": "Verified"
 ,"description": "- 只需要在ai4sec_threat_modeling_agent的工作流中进行实现"
 ,"start_date": "2026-3-17"
 ,"due_date": "1899-12-30"
@@ -137,7 +137,7 @@
 {
 "name": "在查询和匹配OPENCTI中的report时，我希望你不要把所有report都查询回来，而是用手中的report id作为参数去查。"
 ,"type": "ToDo"
-,"status": "Active"
+,"status": "Verified"
 ,"description": "- OpenCTI 中 report 精确查询使用的具体字段名为id或name，如果有ID则优先用id\r\n- OpenCTI 当前运行版本对 Report 的按 name 精确查询已有稳定 GraphQL 查询入口\r\n- 在 live mode 下，当输入既不是标准 report ID 也不是精确 name 时，不允许 fuzzy fallback\r\n- 若 report ID 来自本地测试 bundle 而非 live standard_id，alias 映射应继续保留为兼容层\r\n- 本任务所需的单对象查询限额保持和应用层合同中的OpenCTI 查询配额与分页边界相同"
 ,"start_date": "2026-3-17"
 ,"due_date": "1899-12-30"
