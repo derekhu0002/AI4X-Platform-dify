@@ -2,5 +2,6 @@
 
 | 任务名称 | 负责人 | 支撑文件相对路径 | 关联架构对象 ID | 当前状态 | 是否存在需人工确认项 |
 | --- | --- | --- | --- | --- | --- |
-| 将该MCP功模块替换成该工作流中的节点，所有功能通过节点来实现，不再使用该外部FASTAPI服务 | llm | implementation/taskhelpinfos/2026-3-17_将该MCP功模块替换成该工作流中的节点_所有功能通过节点来实现_不再使用该外部FASTAPI服务.md | 1215, 1436, 1214, 1276, 1226, 1228, 1229 | Active | 是 |
-| 在查询和匹配OPENCTI中的report时，我希望你不要把所有report都查询回来，而是用手中的report id作为参数去查。 | llm | implementation/taskhelpinfos/2026-3-17_在查询和匹配OPENCTI中的report时_我希望你不要把所有report都查询回来_而是用手中的report_id作为参数去查.md | 1215, 1276, 1209, 1436, 1226, 1228 | Active | 是 |
+| i need webhook agent access the opencti platform with a http node in the workflow instead of the current seperate opencti mcp. | llm | implementation/taskhelpinfos/2026-3-18_i_need_webhook_agent_access_the_opencti_platform_with_a_http_node_in_the_workflow_instead_of_the_current_seperate_opencti_mcp.md | 1277, 1436, 1215, 1276, 1226, 1228, 1229 | Active | 是 |
+| i need that the webhook agent analyzes the infrastrctures related with the notified vulurability pushed from opencti to give out the the impact on our product, and the risk score. | llm | implementation/taskhelpinfos/2026-3-18_i_need_that_the_webhook_agent_analyzes_the_infrastrctures_related_with_the_notified_vulurability_pushed_from_opencti_to_give_out_the_the_impact_on_our_product_and_the_risk_score.md | 1277, 1208, 1242, 1243, 1244, 1276, 1226, 1228, 1229 | Active | 是 |
+| add a new llm node responsible for summarize the current structure outpu into a graph and several tables | llm | implementation/taskhelpinfos/2026-3-18_add_a_new_llm_node_responsible_for_summarize_the_current_structure_outpu_into_a_graph_and_several_tables.md | 1436, 1223, 1226, 1228, 1229 | Active | 是 |

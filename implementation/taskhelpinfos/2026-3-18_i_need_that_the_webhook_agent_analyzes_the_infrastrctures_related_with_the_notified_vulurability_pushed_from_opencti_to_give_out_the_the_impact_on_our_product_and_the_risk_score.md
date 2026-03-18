@@ -1,0 +1,88 @@
+# 任务执行简报
+
+- 任务名称：i need that the webhook agent analyzes the infrastrctures related with the notified vulurability pushed from opencti to give out the the impact on our product, and the risk score.
+- 任务类型：ToDo
+- 当前状态：Active
+- 负责人：llm
+- 优先级：Low
+- 起止时间：2026-3-18 至 未设置
+- 关联架构对象名称与 ID：WEBHOOK_AGENT（1277）；BusinessLayer（1208）；业务上下文归并（1242）；威胁与影响研判（1243）；控制缺口与处置建议生成（1244）；OpenCTI Runtime Stack（1276）；业务流程中所有数据都必须是OPENCTI平台中的STIX2.1标准数据（1226）；全局情报底座：OPENCTI 平台（1228）；统一智能入口：DIFY Agent (ai4sec_agent)（1229）
+
+## 1. LLM执行摘要
+
+- 当前任务要让 WEBHOOK_AGENT（1277）在收到漏洞 webhook 后，基于与该漏洞一跳关联的基础设施和产品对象输出产品影响与风险评分。
+- 首要修改对象仍是 `DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml`，因为一跳取数、评分和结构化结果都应在 webhook 工作流内闭环。
+- 输出必须至少包含 `severity_tier`、`risk_score`、`recommended_action`、`business_impact_summary`，并补充影响范围、优先级建议、决策摘要。
+- 查询边界必须严格从一跳关联开始，只取与漏洞直接相关的 `Infrastructure`、`Software`、`system` 等候选对象，不预先扩大全图。
+- 风险评分应采用任务给定的 1-100 量纲，并按资产关键度、暴露面、威胁情报乘数加权；缺失乘数默认 1.0 且必须显式标注缺失。
+- 最关键验收条件是：Webhook 能返回结构化的企业化影响分析结果，且在业务上下文缺失时链路不阻塞、结论带出不完整性提示。
+- 不允许把高风险结果自动扩展为升级通知协同出口；本任务聚焦分析与输出，不扩展通知编排。
+- 主要风险是 OpenCTI 中未必稳定存在业务关键度、暴露面或产品归一字段，因此需要明示假设并给出“需人工确认”的对象清单。
+
+## 2. 已确认事实
+
+- WEBHOOK_AGENT（1277）被 KG 定义为接收 OpenCTI 事件、进行场景路由并复用共享运行时逻辑的 webhook 工作流资产。
+- BusinessLayer（1208）已定义“外部漏洞企业化影响分析服务”，服务目标是把外部漏洞映射为企业受影响范围与优先级，关键交付物为影响分析、优先级建议、决策摘要。
+- 业务上下文归并（1242）的职责是把技术事实映射到业务场景，关键输出是业务上下文摘要。
+- 威胁与影响研判（1243）的职责是把标准化情报、资产关系和历史知识转化为风险结论与优先级建议。
+- 控制缺口与处置建议生成（1244）的职责是基于风险结论输出控制措施、处置建议和例外建议。
+- OpenCTI Runtime Stack（1276）是本仓库内部 OpenCTI 事实底座，支持 GraphQL 接入和 webhook lookup-required STIX bundle 通知。
+- 原则 1226 要求业务流程中的数据必须保持 STIX 2.1 语义；原则 1228 要求情报都来自内部 OpenCTI；原则 1229 要求自动化调度仍由 DIFY Agent 入口承接。
+- 任务描述已明确风险分档：90-100+ 为 `Critical`，70-89 为 `High`，40-69 为 `Medium`，1-39 为 `Low / Normal`。
+
+## 3. 需人工确认 / 未知项
+
+- 未知：OpenCTI 当前是否稳定存有资产关键度、暴露面、在野利用等评分乘数字段。建议先定义字段缺失即乘数 `1.0`，并在结果中输出缺失项说明。
+- 未知：产品影响对象应优先归一为 `Infrastructure`、`Software`、`system` 还是 `Identity` 投影。建议先输出一跳对象名称清单，并把无法稳定归一的对象标记为“需人工确认”。
+- 未知：Webhook 输出是否已有固定 JSON 合同可容纳新增的结构化评分字段。建议优先复用当前响应结构，在兼容范围内追加字段，避免破坏既有消费者。
+- 未知：任务给定 SLA 是否只用于说明，还是需要直接写入 webhook 返回。建议先在 `recommended_action` / `decision_summary` 中体现动作建议，不默认把 SLA 升格为通知逻辑。
+- 未知：Threat Intel Multiplier 所依据的证据来源在当前图谱中的表示方式。建议若无法稳定识别，仅输出“威胁情报缺失，按 1.0 处理”。
+
+## 4. 约束与边界
+
+- 必须遵守的 Principle / Constraint：1226、1228、1229；同时强制落实 Progressive Disclosure 与 Separation of Concerns。
+- 必须保持不变的模块或边界：OpenCTI 作为唯一事实源；分析链路只覆盖 webhook 场景；Notification MCP（1227）不因本任务被扩展为自动通知出口。
+- 明确禁止的实现方式或越界修改：禁止先拉全量 report 或全图关系再做本地匹配；禁止为补评分而引入仓外服务；禁止把高风险自动升级为额外通知工作流。
+- Progressive Disclosure 强制要求：先完成漏洞对象一跳关联查询、最小评分公式、最小结构化输出，再根据缺口逐项加字段。
+- Separation of Concerns 强制要求：对象解析、业务上下文归并、风险评分、结果整形分别处理；不要把 OpenCTI 查询、业务规则和通知逻辑混写。
+
+## 5. 架构元素级任务拆解
+
+| 子任务名称 | 对应架构元素 | 技术目的 | 与其他子任务的依赖关系 |
+| --- | --- | --- | --- |
+| 获取一跳影响对象 | WEBHOOK_AGENT（1277）；OpenCTI Runtime Stack（1276） | 从漏洞对象出发查询一跳关联的 Infrastructure / Software / system 候选 | 是后续评分与摘要的前置 |
+| 归并业务上下文 | 业务上下文归并（1242）；BusinessLayer（1208） | 将技术对象映射为产品影响候选、业务关键度和所有权语义 | 依赖“获取一跳影响对象” |
+| 计算情境化风险评分 | 威胁与影响研判（1243） | 按任务给定公式输出 `risk_score` 与 `severity_tier` | 依赖“归并业务上下文” |
+| 生成处置与决策摘要 | 控制缺口与处置建议生成（1244） | 输出 `recommended_action`、优先级建议、决策摘要与缺失提示 | 依赖“计算情境化风险评分” |
+
+## 6. 推荐实施顺序
+
+1. 动作说明：在 webhook 工作流中确认漏洞信号的对象类型、lookup id 和 VS3 路由输入。目标文件 / 模块 / 目录：`DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml`。对应架构元素 ID：1277。完成判定标准：可稳定获得漏洞对象 ID，并明确评分入口节点。
+2. 动作说明：实现从漏洞出发的一跳关联查询，只拉取 `Infrastructure`、`Software`、`system` 等最小候选集合。目标文件 / 模块 / 目录：`DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml`。对应架构元素 ID：1277、1276、1228。完成判定标准：结果中能列出受影响对象候选，且未做全图拉取。
+3. 动作说明：在工作流内补充业务上下文归并和乘数缺失处理逻辑。目标文件 / 模块 / 目录：`DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml`；必要时 `DifyAgentWorkflow/tools/ai4sec_runtime_tools.py`。对应架构元素 ID：1242、1243。完成判定标准：资产关键度、暴露面、威胁情报缺失时按 1.0 继续执行，并输出缺失说明。
+4. 动作说明：计算 `risk_score`、映射 `severity_tier`，并输出结构化摘要。目标文件 / 模块 / 目录：`DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml`。对应架构元素 ID：1243、1244。完成判定标准：返回结果包含四个核心字段及影响范围、优先级建议、决策摘要。
+5. 动作说明：检查结果不触发额外通知协同出口，仅保留分析输出。目标文件 / 模块 / 目录：`DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml`；`DifyAgentWorkflow/tools/ai4sec_runtime_tools.py`。对应架构元素 ID：1277、1229。完成判定标准：工作流范围仍限于 webhook 分析闭环，无自动升级通知。
+
+## 7. 建议修改目标
+
+- 优先检查的文件：`DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml`；`DifyAgentWorkflow/tools/ai4sec_runtime_tools.py`
+- 可能需要新增的文件：未知；当前建议不新增文件，如需新增仅限与评分字段对齐有关的仓内说明文件，当前结论为“无需新增”。
+- 可能需要避免修改的文件：`mcp/notification_mcp/app/service.py`；`DifyAgentWorkflow/ai4sec_unified_workflow.yaml`；`mcp/opencti_mcp/app/service.py`
+
+## 8. 交付物与验收标准
+
+- [ ] Webhook 能基于漏洞对象输出一跳受影响基础设施 / 产品候选
+- [ ] 返回结果包含 `severity_tier`、`risk_score`、`recommended_action`、`business_impact_summary`
+- [ ] 同时提供影响范围、优先级建议、决策摘要
+- [ ] 缺失业务上下文、暴露面或威胁情报时链路不中断，且缺失项被显式标出
+- [ ] 风险分档严格按任务给定区间映射
+- [ ] 结果不默认触发升级通知或扩展到其他工作流
+
+## 9. 风险、阻塞与缓解措施
+
+| 风险/阻塞 | 影响 | 缓解措施 |
+| --- | --- | --- |
+| OpenCTI 缺少关键度/暴露面/在野利用字段 | 风险评分不完整 | 缺失即按 1.0 计算，并在结果中输出缺失说明 |
+| 一跳对象无法稳定归一为“产品” | 业务影响摘要含糊 | 先输出候选对象清单，并把无法归一的对象标记为需人工确认 |
+| 结构化字段扩展破坏既有 webhook 消费方 | 输出合同回归 | 在现有合同上做兼容追加，避免重命名既有字段 |
+| 评分规则与业务动作阈值被误实现为通知逻辑 | 范围越界 | 将动作阈值保留为分析建议，不直接编排通知或事件单 |

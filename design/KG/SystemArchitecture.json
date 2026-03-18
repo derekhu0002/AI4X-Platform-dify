@@ -110,7 +110,7 @@
 "name": "ai4sec_opencti_mcp"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/ai4sec_opencti_mcp"
-,"description": "FastAPI service that loads configuration from the repository root environment, resolves stable VS1-VS4 aliases to live OpenCTI object identifiers, queries a minimal OpenCTI GraphQL object envelope, enriches the response with local scenario context, accepts STIX bundle payloads, and exposes a passthrough webhook endpoint. In the current implementation, full live STIX projection and real OpenCTI bundle persistence remain partial."
+,"description": "Repository-local OpenCTI MCP compatibility service that loads configuration from the repository root environment, provides STIX projection queries, bundle writeback, webhook passthrough, and exact-only threat-model report resolution for compatibility use cases. After this iteration, the standalone VS1 threat-modeling workflow no longer calls this service at runtime and instead queries OpenCTI GraphQL directly, while 1215 remains the reusable application-layer OpenCTI access service for unified-agent and compatibility scenarios."
 ,"attributes": [
 {
 "name": "code_paths"
@@ -121,32 +121,6 @@
 ,"description": "本地DOCKER容器"
 }
 ]
-,"project_info": {
-"tasks": [
-{
-"name": "将该MCP功模块替换成该工作流中的节点，所有功能通过节点来实现，不再使用该外部FASTAPI服务"
-,"type": "ToDo"
-,"status": "Verified"
-,"description": "- 只需要在ai4sec_threat_modeling_agent的工作流中进行实现"
-,"start_date": "2026-3-17"
-,"due_date": "1899-12-30"
-,"reporter": "derek"
-,"priority": "Low",
-"assigned_to": "llm"
-},
-{
-"name": "在查询和匹配OPENCTI中的report时，我希望你不要把所有report都查询回来，而是用手中的report id作为参数去查。"
-,"type": "ToDo"
-,"status": "Verified"
-,"description": "- OpenCTI 中 report 精确查询使用的具体字段名为id或name，如果有ID则优先用id\r\n- OpenCTI 当前运行版本对 Report 的按 name 精确查询已有稳定 GraphQL 查询入口\r\n- 在 live mode 下，当输入既不是标准 report ID 也不是精确 name 时，不允许 fuzzy fallback\r\n- 若 report ID 来自本地测试 bundle 而非 live standard_id，alias 映射应继续保留为兼容层\r\n- 本任务所需的单对象查询限额保持和应用层合同中的OpenCTI 查询配额与分页边界相同"
-,"start_date": "2026-3-17"
-,"due_date": "1899-12-30"
-,"reporter": "derek"
-,"priority": "Low",
-"assigned_to": "llm"
-}
-]
-}
 },
 {
 "id": "1217",
@@ -552,6 +526,12 @@
 ,"type": "ArchiMate_BusinessProcess"
 ,"browser_path": "Model/System/BusinessLayer/BusinessLayer/知识进化闭环流程"
 ,"description": "固化 VS3 端到端流程"
+,"subdiagram_views": [
+{
+"view_id": "200",
+"view_name": "知识进化闭环流程"
+}
+]
 },
 {
 "id": "1263",
@@ -650,7 +630,7 @@
 },
 {
 "name": "code_paths"
-,"description": "[\"externalDify/docker-compose.yaml\"]"
+,"description": "[\"externalDify/docker-compose.yaml\", \"DifyAgentWorkflow/ai4sec_unified_workflow.yaml\", \"DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml\"]"
 },
 {
 "name": "DIFY版本"
@@ -696,12 +676,39 @@
 "name": "WEBHOOK_AGENT"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/WEBHOOK_AGENT"
+,"description": "Webhook-oriented Dify workflow asset that receives OpenCTI-originated events, routes them into AI4SEC scenario processing, and reuses shared runtime tool logic for signal resolution, scenario routing, and downstream notification preparation."
 ,"attributes": [
 {
 "name": "code_paths"
-,"description": "[ \"DifyAgentWorkflow/ai4sec_unified_workflow.yaml\" ]"
+,"description": "[\"DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml\", \"DifyAgentWorkflow/tools/ai4sec_runtime_tools.py\"]"
 }
 ]
+,"project_info": {
+"tasks": [
+{
+"name": "i need webhook agent access the opencti platform with a http node in the workflow instead of the current seperate opencti mcp."
+,"type": "ToDo"
+,"status": "Active"
+,"description": "- 直连 OpenCTI 时应使用 GraphQL 接口，以 ai4sec_threat_modeling_agent（1436）现有直连查询路径作为对齐基线，若 webhook 场景确有额外字段需求，必须在实现说明中显式列出差异。\r\n- 工作流内 HTTP 节点所需的认证注入方式、秘钥管理方式采用明文方式，优先复用现有 VS1 直连工作流的 OPENCTI_GRAPHQL_URL / OPENCTI_ADMIN_TOKEN 命名；如果 webhook 工作流不能完全复用，需把差异标注为实现假设。\r\n- 在 ai4sec_opencti_webhook_workflow.yaml 中定位当前 MCP 工具调用节点，以此节点承接 GraphQL HTTP 请求。\r\n- 迁移后需要的最小字段集合和关系深度和失败重试语义先按 1436 基线实现，仅当 webhook 下游确有缺口时再补字段，并逐项说明用途。\r\n- 需要对 HTTP 查询结果做与现有兼容服务完全相同的投影合同，先以现有兼容服务返回合同为准做一一对齐，新增字段必须说明用途与下游消费者。\r\n- 只移除 WEBHOOK_AGENT 的运行时依赖，不默认删除或改写 ai4sec_opencti_mcp 其他兼容路径。\r\n- HTTP 节点失败重试、超时与错误码在以当前工作流实际可配置能力为上限，不额外引入仓外补偿逻辑。"
+,"start_date": "2026-3-18"
+,"due_date": "1899-12-30"
+,"reporter": "derek"
+,"priority": "Low",
+"assigned_to": "llm"
+},
+{
+"name": "i need that the webhook agent analyzes the infrastrctures related with the notified vulurability pushed from opencti to give out the the impact on our product, and the risk score."
+,"type": "ToDo"
+,"status": "Active"
+,"description": "- 建议输出与业务层（1208）定义的关键业务对象和 KPI 对齐的结构化摘要，至少包含：影响范围 (Affected Infrastructures/Products)、优先级建议 (Priority Recommendation) 和 决策摘要 (Decision Summary)。优先使用一跳对象本身及其名称作为产品影响候选；若无法稳定归一，输出为“需人工确认”的影响对象清单。固定使用结构化字段输出，先给出 severity_tier、risk_score、recommended_action 与 business_impact_summary 四类核心字段。\r\n- 建议从“一跳关联”开始，即只查询与漏洞直接关联的 Infrastructure 和 Software 、system实体。\r\n- 高风险结果不需要升级或通知协同出口\r\n- 最佳实践是基于行业标准（CVSS）进行技术严重性评估，然后利用企业内部的**业务上下文（Business Context）和威胁情报（Threat Intelligence）**对其进行加权和调整，最终得出一个真正反映该漏洞对“我”企业风险的“情境化风险评分”。\r\n### 1. 风险评分的量纲：建议采用 1-100 分的数值评分体系\r\n**计算公式建议（示例）：**\r\n`AI4SEC Risk Score = (CVSS Base Score * 10) * Asset_Criticality_Multiplier * Exposure_Multiplier * Threat_Intel_Multiplier`\r\n*   **CVSS Base Score * 10**: 将 CVSS 基础分（0-10）映射到 0-100 的基准。\r\n*   **Asset Criticality Multiplier (资产关键度乘数)**:\r\n    *   核心业务资产（如支付网关）：**1.5**\r\n    *   重要业务资产（如用户中心）：**1.2**\r\n    *   一般资产：**1.0**\r\n    *   非关键资产（如测试服务器）：**0.8**\r\n*   **Exposure Multiplier (暴露面乘数)**:\r\n    *   面向互联网直接暴露：**1.5**\r\n    *   面向内网，但可从办公网段访问：**1.1**\r\n    *   隔离环境/核心生产区：**0.9**\r\n*   **Threat Intel Multiplier (威胁情报乘数)**:\r\n    *   已确认有在野利用（Active Exploitation）：**2.0**\r\n    *   已有公开PoC，但无在野利用证据：**1.5**\r\n    *   无公开利用代码：**1.0**\r\n缺失乘数视为 1.0，并在输出中显式标注缺失项，避免阻塞链路。先完成一跳取数与最小评分链路，再按缺口补充必要字段，而不是预先扩大全图查询范围。\r\n### 2. 分档规则：基于 1-100 分的数值范围进行划分\r\n\r\n将最终计算出的 `AI4SEC Risk Score` 映射到您系统中已有的 `severity_tier`。\r\n\r\n| 数值范围 | 风险等级 (Severity Tier) | 英文标识 | 业务定义 |\r\n| :--- | :--- | :--- | :--- |\r\n| **90 - 100+** | **中断级** | `Critical` | 对核心业务构成直接、即时的中断威胁；或存在已被积极利用的高危漏洞。 |\r\n| **70 - 89** | **高** | `High` | 严重影响关键业务功能、可能导致数据泄露或系统权限丢失，需要紧急处理。 |\r\n| **40 - 69** | **中** | `Medium` | 可能对业务造成一定影响，或利用条件较为苛刻，应在常规补丁周期内修复。 |\r\n| **1 - 39** | **低/信息** | `Low / Normal` | 风险较低，影响有限，可机会性修复或接受风险。 |\r\n### 3. 阈值口径：将风险等级直接与处置动作和 SLA 挂钩\r\n\r\n阈值不仅仅是一个数字，它更是行动的触发器。\r\n\r\n| 风险等级 | 处置动作阈值 (Action Threshold) | 建议的处置服务等级协议 (SLA) |\r\n| :--- | :--- | :--- |\r\n| **中断级 (Critical)** | **立即行动**：触发自动化响应（如虚拟补丁、防火墙封禁）、创建最高优先级（P0）事件单、**立即通知**管理层（1234）和安全/业务负责人。 | **24小时内**完成初步缓解，**7天内**完成根除。 |\r\n| **高 (High)** | **紧急处理**：创建高优先级（P1）事件单，由**安全运营团队（1235）**主导响应，并通知相关**业务负责人（1232）**。 | **72小时内**完成初步缓解，**30天内**完成根除。 |\r\n| **中 (Medium)** | **计划内修复**：进入常规漏洞管理或补丁管理流程，无需立即告警，由**情报分析师（1231）**跟踪。 | **90天内**完成修复。 |\r\n| **低/信息 (Low / Normal)** | **按需处理或接受风险**：归档记录，仅在有额外资源或作为其他修复任务的附加项时处理。 | **180天内**或定义为可接受风险。 |\r\n\r\n- OpenCTI 中存在业务关键度等信息，则用其加权计算风险；如果不存在，流程应能继续，但需在输出中明确标注“业务上下文缺失，风险评估可能不完整”。\r\n- 产品影响对象在 OpenCTI 中最终应优先落为 Infrastructure、Software 还是 system / Identity 投影，建议先以一跳对象名称作为候选，无法归一时输出“需人工确认”的对象清单。\r\n- severity_tier 先按任务给定阈值做独立映射，再与现有输出字段名保持一致。\r\n\r\n"
+,"start_date": "2026-3-18"
+,"due_date": "1899-12-30"
+,"reporter": "derek"
+,"priority": "Low",
+"assigned_to": "llm"
+}
+]
+}
 },
 {
 "id": "1279",
@@ -710,47 +717,51 @@
 ,"browser_path": "Model/System/BusinessLayer/BusinessLayer/业务SE(SYSTEM ENGINEER)"
 },
 {
-"id": "1282",
-"name": ""
-,"type": "Object"
-,"browser_path": "Model/System/BusinessLayer/BusinessLayer/威胁建模闭环流程"
-,"description": "MCP需要对查询结果进行过滤，去掉和威胁分析无关的字段，只留下对于后续LLM分析有帮助的字段"
-,"attributes": [
-{
-"name": "code_paths"
-,"description": "[\"mcp/opencti_mcp/app/main.py\", \"mcp/opencti_mcp/app/service.py\", \"mcp/opencti_mcp/app/settings.py\", \"mcp/opencti_mcp/app/models.py\"]"
-},
-{
-"name": "运行环境"
-,"description": "本地DOCKER容器"
-}
-]
-},
-{
 "id": "1436",
 "name": "ai4sec_threat_modeling_agent"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/ai4sec_threat_modeling_agent"
-,"description": "Dedicated standalone Dify advanced-chat workflow agent for VS1 that accepts report reference input, queries OpenCTI MCP threat-model report endpoint, invokes real LLM structured generation, and returns downloadable JSON results in-session."
+,"description": "Dedicated standalone Dify advanced-chat workflow agent for VS1 that accepts report reference input, resolves exact report identifiers, queries OpenCTI GraphQL directly through an inline workflow code node, filters the returned STIX 2.1 evidence bundle, invokes structured LLM generation, and returns downloadable JSON results in-session."
 ,"attributes": [
 {
 "name": "code_paths"
 ,"description": "[ \"DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml\" ]"
 }
 ]
+,"project_info": {
+"tasks": [
+{
+"name": "add a new llm node responsible for summarize the current structure outpu into a graph and several tables"
+,"type": "ToDo"
+,"status": "Active"
+,"description": "1. render the visual graph representing the entities and relationships between them.\r\n2. print the tables with each table representing a type of entity, such as attack pattern, course of action, indicator, attack path etc.\r\n- 关系图的最终承载形式是 Mermaid，先以 STIX 对象名称和 relationship_type 生成最小关系图\r\n- 表格仅在会话中展示，不需要追加到当前 JSON 下载文件中，图表结果不需要单独文件或单独变量输出，把图表作为主分析结果，当前JSON放在后面作为附加展示段落\r\n- `indicator` 与 `attack path` 在当前 VS1 证据集中不会稳定存在，缺失时不显示即可\r\n- 新增 LLM 节点应放在现有主分析节点之后，LLM 节点负责摘要生成，必要时用后置代码节点做轻量格式整理，但不要反转主次职责。\r\n- 表格结果采用 Markdown 表格格式输出，默认使用最小公共列，例如 name、id、type、description、relationship_count；若某类型没有该列则按最小可展示列降级。\r\n"
+,"start_date": "2026-3-18"
+,"due_date": "1899-12-30"
+,"reporter": "derek"
+,"priority": "Low",
+"assigned_to": "llm"
+}
+]
+}
 },
 {
 "id": "1437",
 "name": ""
 ,"type": "Object"
 ,"browser_path": "Model/System/BusinessLayer/BusinessLayer/威胁建模闭环流程"
-,"description": "DIFY上的专用AGENT接收到MCP反馈的结果后，使用如下结构发起LLM分析，并将分析结果反馈显示给用户"
+,"description": "1、使用REPORT ID或NAME查询OPENCTI平台；\r\n2、接收到查询到结果后，对查询结果进行过滤，去掉和威胁分析无关的字段，只留下对于后续LLM分析有帮助的字段；\r\n3、使用发起LLM分析，并将分析结果反馈显示给用户；"
 ,"attributes": [
 {
 "name": "code_paths"
 ,"description": "[ \"DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml\" ]"
 }
 ]
+},
+{
+"id": "1438",
+"name": "外部威胁事件情报提取"
+,"type": "ArchiMate_BusinessProcess"
+,"browser_path": "Model/System/BusinessLayer/BusinessLayer/知识进化闭环流程/外部威胁事件情报提取"
 }
 ],
 "relationships": [
@@ -1182,15 +1193,6 @@
 ,"target_name":"建立统一结果送达与反馈回灌机制"
 },
 {
-"id":"1128"
-,"statement":"WEBHOOK_AGENT --(发送预警通知)--> Notification MCP"
-,"name":"发送预警通知"
-,"source_id":"1277"
-,"target_id":"1227"
-,"source_name":"WEBHOOK_AGENT"
-,"target_name":"Notification MCP"
-},
-{
 "id":"1129"
 ,"statement":"WEBHOOK_AGENT --(access opencti stix data)--> ai4sec_opencti_mcp"
 ,"name":"access opencti stix data"
@@ -1259,80 +1261,40 @@
 },
 {
 "id":"1138"
-,"statement":" --(Association)--> "
+,"statement":" --(Association)--> OpenCTI Runtime Stack"
 ,"name":"Association"
 ,"source_id":"1437"
-,"target_id":"1282"
+,"target_id":"1276"
 ,"source_name":""
-,"target_name":""
+,"target_name":"OpenCTI Runtime Stack"
 },
 {
 "id":"1139"
-,"statement":" --(发起数据查询)--> "
+,"statement":" --(发起数据查询)--> OpenCTI Runtime Stack"
 ,"name":"发起数据查询"
 ,"sequence": "3"
 ,"source_id":"1437"
-,"target_id":"1282"
-,"source_name":""
-,"target_name":""
-},
-{
-"id":"1140"
-,"statement":" --(Association)--> OpenCTI Runtime Stack"
-,"name":"Association"
-,"source_id":"1282"
 ,"target_id":"1276"
 ,"source_name":""
 ,"target_name":"OpenCTI Runtime Stack"
-},
-{
-"id":"1141"
-,"statement":" --(发起数据查询)--> OpenCTI Runtime Stack"
-,"name":"发起数据查询"
-,"description": "发起基于报告ID或者名称的查询，需要查这个容器内的所有实体和关系"
-,"sequence": "4"
-,"source_id":"1282"
-,"target_id":"1276"
-,"source_name":""
-,"target_name":"OpenCTI Runtime Stack"
-},
-{
-"id":"1142"
-,"statement":"OpenCTI Runtime Stack --(Association)--> "
-,"name":"Association"
-,"source_id":"1276"
-,"target_id":"1282"
-,"source_name":"OpenCTI Runtime Stack"
-,"target_name":""
-},
-{
-"id":"1143"
-,"statement":"OpenCTI Runtime Stack --(查询结果)--> "
-,"name":"查询结果"
-,"description": "查到的结果示例：\r\n{\r\n    \"type\": \"bundle\",\r\n    \"id\": \"bundle--9fa941ad-a586-48a0-a5cb-73d993c7f934\",\r\n    \"objects\": [\r\n        {\r\n            \"id\": \"report--ed90bfef-5bcd-534f-89f3-49a4a6bce1dd\",\r\n            \"spec_version\": \"2.1\",\r\n            \"revoked\": false,\r\n            \"confidence\": 100,\r\n            \"created\": \"2026-03-17T05:08:02.000Z\",\r\n            \"modified\": \"2026-03-17T05:14:26.701Z\",\r\n            \"name\": \"VPD DESIGN\",\r\n            \"description\": \"VPD\",\r\n            \"published\": \"2026-03-17T05:08:02.000Z\",\r\n            \"x_opencti_workflow_id\": \"4d51c81d-8087-48f0-a107-4a77610bdfa2\",\r\n            \"x_opencti_id\": \"92069d7e-6401-454d-a580-30111e9c69c8\",\r\n            \"x_opencti_type\": \"Report\",\r\n            \"type\": \"report\",\r\n            \"object_refs\": [\r\n                \"identity--bd358fe8-cc8b-5fc6-8911-bef8e682bef7\",\r\n                \"infrastructure--3a59cf10-a0c2-53be-b5f4-1245bc075f08\",\r\n                \"infrastructure--f0ff5cb8-7f50-5b88-a200-bd39609cc71d\",\r\n                \"relationship--18d0a351-9a53-52b1-a5d0-1aa9fd7aeaff\",\r\n                \"relationship--f6788319-3d46-5c96-a7a7-438e4880f37a\"\r\n            ]\r\n        },\r\n        {\r\n            \"id\": \"identity--bd358fe8-cc8b-5fc6-8911-bef8e682bef7\",\r\n            \"spec_version\": \"2.1\",\r\n            \"revoked\": false,\r\n            \"confidence\": 100,\r\n            \"created\": \"2026-03-17T05:13:26.037Z\",\r\n            \"modified\": \"2026-03-17T05:13:26.037Z\",\r\n            \"identity_class\": \"system\",\r\n            \"name\": \"\\u624b\\u673a\",\r\n            \"x_opencti_id\": \"e598161a-0a78-4bc3-8df8-acb29558136a\",\r\n            \"x_opencti_type\": \"System\",\r\n            \"type\": \"identity\"\r\n        },\r\n        {\r\n            \"id\": \"infrastructure--3a59cf10-a0c2-53be-b5f4-1245bc075f08\",\r\n            \"spec_version\": \"2.1\",\r\n            \"revoked\": false,\r\n            \"confidence\": 100,\r\n            \"created\": \"2026-03-17T05:11:11.484Z\",\r\n            \"modified\": \"2026-03-17T05:11:11.484Z\",\r\n            \"name\": \"ADS\\u4e91\",\r\n            \"description\": \"\\u529f\\u80fd\\u70b9\\uff1a\\\\r\\\\n\\u5f53\\u6536\\u5230\\u8f66\\u4e3bAPP\\u8bf7\\u6c42\\u8ddd\\u79bb\\u9650\\u5236\\u53c2\\u6570\\u7684\\u8bf7\\u6c42\\u540e\\uff0c\\u4e0b\\u53d1\\u8ddd\\u79bb\\u9650\\u5236\\u53c2\\u6570\\uff1amaxMobileDistanceLimit\\u3002\\n\\u96c6\\u6210log4j-core\\u7528\\u4e8e\\u8bb0\\u5f55\\u65e5\\u5fd7\\u4fe1\\u606f\",\r\n            \"x_opencti_id\": \"617983d6-88bd-4efd-aaa9-7e343d316904\",\r\n            \"x_opencti_type\": \"Infrastructure\",\r\n            \"type\": \"infrastructure\"\r\n        },\r\n        {\r\n            \"id\": \"infrastructure--f0ff5cb8-7f50-5b88-a200-bd39609cc71d\",\r\n            \"spec_version\": \"2.1\",\r\n            \"revoked\": false,\r\n            \"confidence\": 100,\r\n            \"created\": \"2026-03-17T05:12:17.903Z\",\r\n            \"modified\": \"2026-03-17T05:12:17.903Z\",\r\n            \"name\": \"\\u8f66\\u4e3bAPP\",\r\n            \"description\": \"\\u95ee\\u754c\\u6216\\u4e7e\\u5764APP\\\\r\\\\n\\u529f\\u80fd\\u70b9\\uff1a\\\\r\\\\n1\\u3001\\u8f66\\u4e3bAPP\\uff08\\u96c6\\u6210\\u4e86ADS SDK\\uff09\\u8fdb\\u5165VPD\\u9875\\u9762\\u65f6\\uff0c\\u5411ADS\\u4e91\\u8bf7\\u6c42\\u9650\\u5236\\u53c2\\u6570\\uff0c\\u63a5\\u53d7\\u5230\\u4e91\\u7aef\\u4e0b\\u53d1\\u7684\\u8ddd\\u79bb\\u9650\\u5236\\u53c2\\u6570\\u540e\\uff0c\\u8f66\\u4e3bAPP\\u6839\\u636e\\u8be5\\u53c2\\u6570\\u63a7\\u5236\\u754c\\u9762\\u6309\\u94ae\\u662f\\u5426\\u7f6e\\u7070\\u65e0\\u6cd5\\u9009\\u62e9VPD\\u529f\\u80fd\\uff1a\\\\r\\\\n1\\uff09\\u8fd9\\u91cc\\u7684\\u8ddd\\u79bb\\u7684\\u5b9a\\u4e49\\uff1a\\u8f66\\u4e3bAPP\\u6240\\u5728\\u624b\\u673a\\u548c\\u8f66\\u8f86\\u7684\\u8ddd\\u79bb\\uff1b\\\\r\\\\n2\\uff09\\u5f53\\u524d\\u5224\\u65ad\\u903b\\u8f91\\uff1a\\u82e5\\u8be5\\u8ddd\\u79bb\\u5927\\u57df1500MM\\uff0c\\u5219\\u4e0d\\u5141\\u8bb8\\u8f66\\u4e3b\\u4f7f\\u7528VPD\\u529f\\u80fd\\uff08\\u5c06VPD\\u6309\\u94ae\\u7f6e\\u7070\\u65e0\\u6cd5\\u9009\\u62e9\\uff09\\uff1b\\\\r\\\\n\\\\r\\\\nVPD:\\u667a\\u80fd\\u9a7e\\u9a76\\u9886\\u57df\\u7684VPD\\u901a\\u5e38\\u6307Valet Parking Driving\\uff08\\u6cca\\u8f66\\u4ee3\\u9a7e\\uff09\\uff0c\\u662f\\u4e00\\u79cd\\u9ad8\\u9636\\u667a\\u80fd\\u6cca\\u8f66\\u529f\\u80fd\\u3002\\u5b83\\u5141\\u8bb8\\u8f66\\u4e3b\\u5728\\u505c\\u8f66\\u573a\\u5165\\u53e3\\u6216\\u51fa\\u53d1\\u5c42\\u4e0b\\u8f66\\uff0c\\u8f66\\u8f86\\u901a\\u8fc7\\u81ea\\u8eab\\u4f20\\u611f\\u5668\\u548c\\u7b97\\u6cd5\\u81ea\\u52a8\\u5b8c\\u6210\\u8fdb\\u5165\\u5730\\u5e93\\u3001\\u5bfb\\u627e\\u8f66\\u4f4d\\u3001\\u505c\\u5165\\u8f66\\u4f4d\\u4ee5\\u53ca\\u81ea\\u52a8\\u9a76\\u51fa\\u63a5\\u4eba\\u7b49\\u64cd\\u4f5c\\uff0c\\u5b9e\\u73b0\\u4e86\\u201c\\u8f66\\u627e\\u4eba\\u201d\\u548c\\u201c\\u4eba\\u627e\\u8f66\\u201d\\u7684\\u81ea\\u52a8\\u5316\\u3002\",\r\n            \"x_opencti_id\": \"fcc092fa-5727-4ac1-998c-7366ec118ca0\",\r\n            \"x_opencti_type\": \"Infrastructure\",\r\n            \"type\": \"infrastructure\"\r\n        },\r\n        {\r\n            \"id\": \"relationship--18d0a351-9a53-52b1-a5d0-1aa9fd7aeaff\",\r\n            \"spec_version\": \"2.1\",\r\n            \"relationship_type\": \"communicates-with\",\r\n            \"description\": \"HTTPS\\u63a5\\u53e3\\u8bf7\\u6c42\\u8ddd\\u79bb\\u9650\\u5236\\u53c2\\u6570\\n{\\n\\\"protocol\\\":HTTPS\\n}\",\r\n            \"start_time\": \"2026-03-17T05:12:41.000Z\",\r\n            \"stop_time\": \"2026-03-17T05:13:41.000Z\",\r\n            \"revoked\": false,\r\n            \"confidence\": 100,\r\n            \"lang\": \"en\",\r\n            \"created\": \"2026-03-17T05:14:00.905Z\",\r\n            \"modified\": \"2026-03-17T05:16:36.054Z\",\r\n            \"x_opencti_id\": \"5dd1eaae-e4ef-423c-9275-c6ede598f52d\",\r\n            \"x_opencti_type\": \"communicates-with\",\r\n            \"type\": \"relationship\",\r\n            \"source_ref\": \"infrastructure--f0ff5cb8-7f50-5b88-a200-bd39609cc71d\",\r\n            \"target_ref\": \"infrastructure--3a59cf10-a0c2-53be-b5f4-1245bc075f08\"\r\n        },\r\n        {\r\n            \"id\": \"relationship--f6788319-3d46-5c96-a7a7-438e4880f37a\",\r\n            \"spec_version\": \"2.1\",\r\n            \"relationship_type\": \"related-to\",\r\n            \"description\": \"\\u8fd0\\u884c\\u5728\",\r\n            \"start_time\": \"2026-03-17T05:13:11.000Z\",\r\n            \"stop_time\": \"2026-03-17T05:14:11.000Z\",\r\n            \"revoked\": false,\r\n            \"confidence\": 100,\r\n            \"lang\": \"en\",\r\n            \"created\": \"2026-03-17T05:14:24.773Z\",\r\n            \"modified\": \"2026-03-17T05:14:24.773Z\",\r\n            \"x_opencti_id\": \"81949bd5-98af-4f98-abeb-76b6c74d53c4\",\r\n            \"x_opencti_type\": \"related-to\",\r\n            \"type\": \"relationship\",\r\n            \"source_ref\": \"infrastructure--f0ff5cb8-7f50-5b88-a200-bd39609cc71d\",\r\n            \"target_ref\": \"identity--bd358fe8-cc8b-5fc6-8911-bef8e682bef7\"\r\n        }\r\n    ]\r\n}"
-,"sequence": "5"
-,"source_id":"1276"
-,"target_id":"1282"
-,"source_name":"OpenCTI Runtime Stack"
-,"target_name":""
 },
 {
 "id":"1144"
-,"statement":" --(Association)--> "
+,"statement":"OpenCTI Runtime Stack --(Association)--> "
 ,"name":"Association"
-,"source_id":"1282"
+,"source_id":"1276"
 ,"target_id":"1437"
-,"source_name":""
+,"source_name":"OpenCTI Runtime Stack"
 ,"target_name":""
 },
 {
 "id":"1145"
-,"statement":" --(查询结果)--> "
+,"statement":"OpenCTI Runtime Stack --(查询结果)--> "
 ,"name":"查询结果"
 ,"sequence": "6"
-,"source_id":"1282"
+,"source_id":"1276"
 ,"target_id":"1437"
-,"source_name":""
+,"source_name":"OpenCTI Runtime Stack"
 ,"target_name":""
 },
 {
@@ -1356,12 +1318,13 @@
 },
 {
 "id":"1244"
-,"statement":"ai4sec_threat_modeling_agent --(access opencti stix data)--> ai4sec_opencti_mcp"
+,"statement":"ai4sec_threat_modeling_agent --(access opencti stix data)--> OpenCTI Runtime Stack"
 ,"name":"access opencti stix data"
+,"description": "accesses OpenCTI directly through OPENCTI_GRAPHQL_URL from its code node"
 ,"source_id":"1436"
-,"target_id":"1215"
+,"target_id":"1276"
 ,"source_name":"ai4sec_threat_modeling_agent"
-,"target_name":"ai4sec_opencti_mcp"
+,"target_name":"OpenCTI Runtime Stack"
 },
 {
 "id":"1245"
@@ -1629,8 +1592,7 @@
 "1437",
 "1279",
 "1231",
-"1276",
-"1282"
+"1276"
 ]
 ,"included_relationships": [
 "1134",
@@ -1639,14 +1601,23 @@
 "1137",
 "1138",
 "1139",
-"1140",
-"1141",
-"1142",
-"1143",
 "1144",
 "1145",
 "1146",
 "1147"
+]
+},
+{
+"view_id": "200",
+"view_name": "知识进化闭环流程"
+,"browser_path": "Model/System/BusinessLayer/BusinessLayer/知识进化闭环流程/知识进化闭环流程"
+,"parent_element_id": "1262"
+,"parent_element_name": "知识进化闭环流程"
+,"included_elements": [
+"1438"
+]
+,"included_relationships": [
+
 ]
 },
 {
@@ -1689,7 +1660,6 @@
 "1085",
 "1086",
 "1089",
-"1128",
 "1129",
 "1130",
 "1131",
