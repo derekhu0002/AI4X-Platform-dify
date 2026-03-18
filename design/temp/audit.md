@@ -1,6 +1,167 @@
 ## Part 1: The Architecture Change Report
 
 ### [TRACEABILITY - UPDATE]
+*   **Element Name:** `1214 / ai4sec_agent`
+*   **Code Paths:** `["DifyAgentWorkflow/ai4sec_unified_workflow.yaml", "DifyAgentWorkflow/tools/ai4sec_runtime_tools.py"]`
+*   **Reason:** `code_paths is missing, but the element is implemented by the unified Dify workflow asset and shared runtime tool module.`
+
+*   **Element Name:** `1215 / ai4sec_opencti_mcp`
+*   **Code Paths:** `["mcp/opencti_mcp/app/main.py", "mcp/opencti_mcp/app/service.py", "mcp/opencti_mcp/app/models.py", "mcp/opencti_mcp/app/settings.py"]`
+*   **Reason:** `code_paths is missing, and the implementation has materially changed during this iteration to exact-only report lookup and compatibility-oriented threat-model support.`
+
+*   **Element Name:** `1275 / Dify Runtime Stack`
+*   **Code Paths:** `["externalDify/docker-compose.yaml", "DifyAgentWorkflow/ai4sec_unified_workflow.yaml", "DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml"]`
+*   **Reason:** `code_paths is missing, but the runtime stack is concretely represented by the Dify compose deployment and the workflow assets executed on it.`
+
+*   **Element Name:** `1276 / OpenCTI Runtime Stack`
+*   **Code Paths:** `["external_opencti/docker-compose.yml", "external_opencti/opencti_webhook_signal_template.ejs"]`
+*   **Reason:** `code_paths is missing, while the stack is concretely implemented by the repository-owned OpenCTI compose deployment and webhook signal template.`
+
+*   **Element Name:** `1277 / WEBHOOK_AGENT`
+*   **Code Paths:** `["DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml", "DifyAgentWorkflow/tools/ai4sec_runtime_tools.py"]`
+*   **Reason:** `Existing code_paths is incomplete; current metadata points only to the unified workflow and misses the dedicated webhook workflow plus the shared routing/tool logic.`
+
+*   **Element Name:** `1436 / ai4sec_threat_modeling_agent`
+*   **Code Paths:** `["DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml"]`
+*   **Reason:** `code_paths is missing, and this element now maps to a standalone VS1 workflow that directly queries OpenCTI GraphQL rather than calling ai4sec_opencti_mcp at runtime.`
+
+### [TRACEABILITY - ALIGNED (OMITTED)]
+*   **Rule:** Do not list aligned elements one-by-one.
+*   **Summary:** `1 audited application element was already aligned and omitted from [TRACEABILITY - UPDATE]: 1227 / Notification MCP.`
+
+### [ELEMENT - ADD]
+*   **Name:** `N/A`
+*   **Type:** `N/A`
+*   **Parent View:** `N/A`
+*   **Description:** `No mandatory new architecture element is required for the current as-built implementation after mapping the changed workflow, MCP, notification, and runtime files back to existing KG elements.`
+*   **Attributes:** `N/A`
+
+### [ELEMENT - MODIFY]
+*   **Name:** `1215 / ai4sec_opencti_mcp`
+*   **Change Summary:** `The current description still presents 1215 as the primary VS1 runtime threat-model provider and understates the now-implemented exact-only lookup behavior. After this iteration, 1215 remains an MCP compatibility service, but VS1 standalone runtime no longer depends on it.`
+*   **TOBE Name:** `N/A`
+*   **TOBE Description:** `Repository-local OpenCTI MCP compatibility service that loads configuration from the repository root environment, provides STIX projection queries, bundle writeback, webhook passthrough, and exact-only threat-model report resolution for compatibility use cases. After this iteration, the standalone VS1 threat-modeling workflow no longer calls this service at runtime and instead queries OpenCTI GraphQL directly, while 1215 remains the reusable application-layer OpenCTI access service for unified-agent and compatibility scenarios.`
+*   **TOBE Attributes:**
+    *   `code_paths = ["mcp/opencti_mcp/app/main.py", "mcp/opencti_mcp/app/service.py", "mcp/opencti_mcp/app/models.py", "mcp/opencti_mcp/app/settings.py"]`
+*   **TOBE Browser Path:** `N/A`
+
+*   **Name:** `1436 / ai4sec_threat_modeling_agent`
+*   **Change Summary:** `The current description says this element queries the MCP threat-model endpoint, but the as-built workflow now performs direct GraphQL access to OpenCTI inside the Dify code node.`
+*   **TOBE Name:** `N/A`
+*   **TOBE Description:** `Dedicated standalone Dify advanced-chat workflow agent for VS1 that accepts report reference input, resolves exact report identifiers, queries OpenCTI GraphQL directly through an inline workflow code node, filters the returned STIX 2.1 evidence bundle, invokes structured LLM generation, and returns downloadable JSON results in-session. This runtime path no longer depends on ai4sec_opencti_mcp.`
+*   **TOBE Attributes:**
+    *   `code_paths = ["DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml"]`
+*   **TOBE Browser Path:** `N/A`
+
+*   **Name:** `1218 / 外部站点`
+*   **Change Summary:** `The element is modeled as implemented, but no crawler, connector adapter, or site-ingestion runtime exists in the repository. It should be marked as future scope rather than current implementation.`
+*   **TOBE Name:** `N/A`
+*   **TOBE Description:** `[PROPOSED] Future external source endpoint representing third-party intelligence or public-site inputs. No dedicated crawling, scraping, or connector runtime is implemented in the current repository; current integration relies on OpenCTI-side ingestion and webhook-driven delivery instead.`
+*   **TOBE Attributes:**
+    *   `code_paths = []`
+*   **TOBE Browser Path:** `N/A`
+
+*   **Name:** `1277 / WEBHOOK_AGENT`
+*   **Change Summary:** `The element lacks description and has incomplete traceability for the dedicated webhook workflow path.`
+*   **TOBE Name:** `N/A`
+*   **TOBE Description:** `Webhook-oriented Dify workflow asset that receives OpenCTI-originated events, routes them into AI4SEC scenario processing, and reuses shared runtime tool logic for signal resolution, scenario routing, and downstream notification preparation.`
+*   **TOBE Attributes:**
+    *   `code_paths = ["DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml", "DifyAgentWorkflow/tools/ai4sec_runtime_tools.py"]`
+*   **TOBE Browser Path:** `N/A`
+
+### [RELATIONSHIP - ADD]
+*   **Source:** `ai4sec_threat_modeling_agent`
+*   **Target:** `OpenCTI Runtime Stack`
+*   **Type:** `Access`
+*   **Parent View:** `Model/System/ApplicationLayer/ApplicationLayer/ApplicationLayer`
+*   **Description:** `The as-built VS1 standalone workflow now accesses OpenCTI directly through OPENCTI_GRAPHQL_URL from its code node, so the graph needs an explicit direct access relationship from 1436 to 1276. This relationship should supersede the old 1436 -> 1215 runtime interpretation represented by relationship 1244.`
+
+## Part 2: Business Gap Analysis
+*   **Implemented Processes:** `The repository now directly supports the VS1 threat-modeling closed loop through a standalone Dify workflow, OpenCTI live report lookup, filtered STIX evidence projection, LLM structured output, and validation assets. Shared workflow routing, OpenCTI MCP, Notification MCP, and validation collateral also provide partial support foundations for broader business-layer interaction.`
+*   **Missing Capabilities:** `The BusinessLayer processes for incident response closed loop (1261), knowledge evolution closed loop (1262), and environment-aware monitoring closed loop (1263) still lack equivalent as-built dedicated workflow implementations at the same depth as VS1. The unified agent remains a routing shell rather than a fully realized end-to-end executor for VS2-VS4. Dify-side bundle writeback and human-verified UI acceptance are also incomplete for the VS1 closed loop.`
+*   **Suggestions:** `Prioritize turning VS2-VS4 from routing placeholders into executable workflow assets, add explicit writeback/orchestration coverage where the business process expects closed-loop persistence, and link each business process to a concrete workflow or service artifact with code_paths-backed traceability.`
+
+## Part 3: Documentation & README Synchronization
+*   **Reviewed READMEs:**
+    *   **File:** `README.md`
+    *   **File:** `tests/validation/README.md`
+*   **Discrepancies:** `The root README is no longer aligned with the current VS1 implementation. It still describes the standalone VS1 workflow as using an HTTP request node that calls /query/threat-model-report on OpenCTI MCP, and it still documents fuzzy fallback behavior in the MCP threat-model endpoint description. The current implementation instead uses direct GraphQL in DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml, exact-id/exact-name lookup, schema-compatibility handling for live OpenCTI fields, and compact analysis_input without duplicated bundle payloads. The validation README remains broadly aligned because it documents manual acceptance scope and does not claim the obsolete MCP runtime path.`
+*   **Recommended Updates (Not Applied):** `Update the root README sections for the standalone VS1 workflow and OpenCTI MCP so they describe direct OpenCTI GraphQL access in the workflow, exact-only report resolution, compact prompt payload construction, and the remaining human Dify UI validation step. Keep tests/validation/README.md unchanged except for optional wording that references the standalone VS1 workflow as the current deepest implemented business-layer path.`
+
+## Part 4: Strategy & Architecture Compliance Report
+*   **Compliance:** `PARTIAL`
+*   **Violations:** `The implementation still respects the high-level principles that OpenCTI is the central CTI substrate, STIX 2.1 remains the primary evidence format, and Dify is the user-facing orchestration entry. However, Separation of Concerns is only partially satisfied because the standalone VS1 workflow now duplicates part of the OpenCTI query/projection logic that also exists in mcp/opencti_mcp/app/service.py. Traceability compliance is also weak because critical application and technology elements still lack or understate code_paths in the KG. Finally, the current architecture graph still implies 1436 -> 1215 runtime access, which no longer matches the as-built direct GraphQL path to 1276.`
+*   **Recommendations:** `Update KG descriptions and relationships to reflect the direct VS1 runtime path, add missing code_paths for all active application and technology elements, and decide whether direct GraphQL access in workflow nodes is now the target architecture or a temporary optimization. If it is the target architecture, isolate shared projection logic into a reusable library or clearly separate workflow-resident projection from MCP-resident compatibility services to restore modularity.`
+
+## Part 5: KG Reorganization Plan (Progressive Disclosure + SoC)
+
+### [REORGANIZATION - PRINCIPLES CHECK]
+*   **Progressive Disclosure:** `PARTIAL. The current ApplicationLayer view mixes runtime stacks, unified orchestration, standalone VS1 execution, webhook processing, notification dispatch, and external connector placeholders in a single diagram. This is too broad for readers trying to understand one runtime path at a time.`
+*   **Separation of Concerns:** `PARTIAL. Responsibilities are separated in code directories, but the KG presentation still collapses orchestration, data access, webhook ingress, and notification integration into the same application-layer view, and the graph has not been updated to reflect the direct VS1 OpenCTI access path.`
+*   **Hotspots:** `Model/System/ApplicationLayer/ApplicationLayer/ApplicationLayer`, `Model/System/BusinessLayer/BusinessLayer/威胁建模闭环流程/威胁建模闭环流程001`, and `Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/Strategic Goals and Principles` are the main cognitive-overload hotspots.`
+
+### [VIEW - ADD]
+*   **View Name:** `VS1 Threat Modeling Runtime Flow`
+*   **Target Browser Path:** `Model/System/ApplicationLayer/ApplicationLayer/VS1 Threat Modeling Runtime Flow`
+*   **Purpose:** `Explain only the standalone VS1 runtime path from user input to OpenCTI retrieval and LLM output.`
+*   **Description:** `Stakeholders: security architect, intelligence analyst, application owner. Concerns: exact report lookup, direct OpenCTI access, filtered STIX payload generation, LLM threat-model output. Purpose: make the as-built VS1 runtime path readable without unrelated webhook or notification concerns. Scope: ai4sec_threat_modeling_agent, Dify Runtime Stack, OpenCTI Runtime Stack, and the direct access relationship added for this iteration.`
+*   **Included Elements:** `["1436", "1275", "1276"]`
+*   **Included Relationships:** `[]`
+*   **Reason:** `This isolates the newly implemented direct GraphQL path and prevents the main ApplicationLayer view from mixing standalone VS1 details with unrelated platform composition.`
+
+### [VIEW - MODIFY]
+*   **View Name:** `ApplicationLayer`
+*   **Current Browser Path:** `Model/System/ApplicationLayer/ApplicationLayer/ApplicationLayer`
+*   **Target Browser Path:** `Model/System/ApplicationLayer/ApplicationLayer/ApplicationLayer`
+*   **Change:** `Narrow Scope / Re-layout`
+*   **Before Scope:** `Unified agent, standalone VS1 agent, webhook agent, external connectors, notification service, and runtime stacks are all shown together with access, aggregation, webhook, and notification relationships.`
+*   **After Scope:** `Keep this view as high-level platform composition only: unified agent, standalone agent, webhook agent, Notification MCP, Dify Runtime Stack, OpenCTI Runtime Stack, and coarse-grained integration boundaries. Move scenario-specific runtime flows into focused subordinate views.`
+*   **Description Update:** `Stakeholders: architects, maintainers, platform integrators. Concerns: top-level application composition and platform boundaries. Purpose: provide the entry-point overview before drilling into scenario-specific runtime views. Scope: application-layer primary components and coarse integration lines only.`
+
+### [VIEW - SPLIT]
+*   **Source View:** `ApplicationLayer`
+*   **Source Browser Path:** `Model/System/ApplicationLayer/ApplicationLayer/ApplicationLayer`
+*   **New Views:** `["VS1 Threat Modeling Runtime Flow", "OpenCTI MCP Compatibility Service", "Notification and Webhook Integration"]`
+*   **Target Browser Paths:** `["Model/System/ApplicationLayer/ApplicationLayer/VS1 Threat Modeling Runtime Flow", "Model/System/ApplicationLayer/ApplicationLayer/OpenCTI MCP Compatibility Service", "Model/System/ApplicationLayer/ApplicationLayer/Notification and Webhook Integration"]`
+*   **Split Logic:** `Separate scenario execution, compatibility data-access service behavior, and webhook/notification integration into different concerns instead of one mixed application diagram.`
+*   **Description Requirement:** `For each new View, include Stakeholders / Concerns / Purpose / Scope in its description.`
+
+### [VIEW - MERGE]
+*   **Source Views:** `[]`
+*   **Source Browser Paths:** `[]`
+*   **Target View:** `N/A`
+*   **Target Browser Path:** `N/A`
+*   **Merge Logic:** `No merge is recommended in the current audit scope; the main readability problem is overloaded mixed-concern views, not redundant duplicate views.`
+*   **Description Requirement:** `N/A`
+
+### [ELEMENT - MOVE]
+*   **Element:** `N/A`
+*   **Current Browser Path:** `N/A`
+*   **Target Browser Path:** `N/A`
+*   **Reason:** `No element browser-path move is strictly required; the primary problem is missing traceability and overloaded views rather than wrong ownership folder placement.`
+
+### [RELATIONSHIP - MOVE]
+*   **Relationship:** `1082 / ai4sec_agent --(access opencti stix data)--> ai4sec_opencti_mcp`
+*   **From View:** `ApplicationLayer`
+*   **To View:** `OpenCTI MCP Compatibility Service`
+*   **Reason:** `This relationship is a compatibility/data-access concern and should be shown in a dedicated data-access view instead of the top-level application composition view.`
+
+*   **Relationship:** `1083 / ai4sec_opencti_mcp --(access...)--> OpenCTI Runtime Stack`
+*   **From View:** `ApplicationLayer`
+*   **To View:** `OpenCTI MCP Compatibility Service`
+*   **Reason:** `This relationship belongs with MCP-to-OpenCTI access semantics and clutters the platform overview when shown together with unrelated notification and webhook relationships.`
+
+*   **Relationship:** `1089 / ai4sec_agent -> Notification MCP`
+*   **From View:** `ApplicationLayer`
+*   **To View:** `Notification and Webhook Integration`
+*   **Reason:** `Notification dispatch is a separate concern from VS1 direct OpenCTI access and should be isolated to improve readability.`
+
+*   **Relationship:** `1244 / ai4sec_threat_modeling_agent --(access opencti stix data)--> ai4sec_opencti_mcp`
+*   **From View:** `ApplicationLayer`
+*   **To View:** `VS1 Threat Modeling Runtime Flow`
+*   **Reason:** `This relationship is currently the closest existing model anchor for VS1 runtime data access. It should be reviewed in the dedicated VS1 runtime view and replaced there by the new direct 1436 -> 1276 access relationship so the top-level view no longer carries an outdated runtime interpretation.`## Part 1: The Architecture Change Report
+
+### [TRACEABILITY - UPDATE]
 *   **Element Name:** `1436 / ai4sec_threat_modeling_agent`
 *   **Code Paths:** `[
     "DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml"
