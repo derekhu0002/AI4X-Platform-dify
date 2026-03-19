@@ -97,37 +97,67 @@
 "name": "ai4sec_agent"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/ai4sec_agent"
-,"description": "AI4SEC Dify advanced-chat workflow asset that routes user input across VS1-VS4, calls ai4sec_opencti_mcp for scenario-specific context retrieval, and includes a VS4 manual review gate followed by notification dispatch to Notification MCP. OpenCTI bundle writeback orchestration is not yet wired in the Dify workflow."
+,"description": "Retired AI4SEC unified Dify workflow asset. The repository-local runtime paths `DifyAgentWorkflow/ai4sec_unified_workflow.yaml` and `DifyAgentWorkflow/tools/ai4sec_runtime_tools.py` were removed on 2026-03-19. Current in-repo runtime has shifted to separate Dify workflows, and no compatibility shell redirects calls through this element."
 ,"attributes": [
 {
 "name": "code_paths"
-,"description": "[\"DifyAgentWorkflow/ai4sec_unified_workflow.yaml\", \"DifyAgentWorkflow/tools/ai4sec_runtime_tools.py\"]"
+,"description": "[]"
 }
 ]
+,"project_info": {
+"tasks": [
+{
+"name": "remove"
+,"type": "ToDo"
+,"status": "Active"
+,"description": "remove this element and related codes.\r\n- 先按“运行时与可执行路径”处理，文档与测试单独列为后续清理批次。\r\n- 默认不重定向历史入口，仅移除并显式暴露缺口\r\n- 删除后对告警通知路径无影响，当前没有告警通知对象"
+,"start_date": "2026-3-19"
+,"due_date": "1899-12-30"
+,"reporter": "derek"
+,"priority": "Low",
+"assigned_to": "llm"
+}
+]
+}
 },
 {
 "id": "1215",
 "name": "ai4sec_opencti_mcp"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/ai4sec_opencti_mcp"
-,"description": "Repository-local OpenCTI MCP compatibility service that loads configuration from the repository root environment, provides STIX projection queries, bundle writeback, webhook passthrough, and exact-only threat-model report resolution for compatibility use cases. After this iteration, the standalone VS1 threat-modeling workflow no longer calls this service at runtime and instead queries OpenCTI GraphQL directly, while 1215 remains the reusable application-layer OpenCTI access service for unified-agent and compatibility scenarios."
+,"description": "Retired repository-local OpenCTI MCP compatibility service. Its FastAPI implementation and direct repository call sites were removed on 2026-03-19. The remaining in-repo workflows now access OpenCTI GraphQL directly through `OPENCTI_GRAPHQL_URL`; this element is kept only as a historical architecture reference and no longer represents an active runtime service."
 ,"attributes": [
 {
 "name": "code_paths"
-,"description": "[\"mcp/opencti_mcp/app/main.py\", \"mcp/opencti_mcp/app/service.py\", \"mcp/opencti_mcp/app/settings.py\", \"mcp/opencti_mcp/app/models.py\"]"
+,"description": "[]"
 },
 {
 "name": "运行环境"
 ,"description": "本地DOCKER容器"
 }
 ]
+,"project_info": {
+"tasks": [
+{
+"name": "remove"
+,"type": "ToDo"
+,"status": "Active"
+,"description": "remove this element and related codes.\r\n- 投影能力在各AGENT流中，回写能力不再需要\r\n- 历史兼容接口外部已不再依赖"
+,"start_date": "2026-3-19"
+,"due_date": "1899-12-30"
+,"reporter": "derek"
+,"priority": "Low",
+"assigned_to": "llm"
+}
+]
+}
 },
 {
 "id": "1217",
 "name": "外部信息爬取Connector"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/外部信息爬取Connector"
-,"description": "[PROPOSED] Future external intelligence collection agent. No crawler implementation, connector runtime, or scheduled ingestion code is currently present in this repository."
+,"description": "[PROPOSED] Future external intelligence crawling connector intended to actively ingest public-site or third-party threat intelligence into OpenCTI. No implementation (crawler runtime, scheduler, or site-ingestion adapter) has been delivered in the current repository. Current external intelligence ingestion relies exclusively on OpenCTI-side connectors and webhook-driven delivery by external parties."
 },
 {
 "id": "1218",
@@ -141,7 +171,7 @@
 "name": "支持快速的情报生产和消费"
 ,"type": "ArchiMate_Goal"
 ,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/支持快速的情报生产和消费"
-,"description": "以统一情报语义、统一智能入口和统一通知通道支撑从识别、研判、响应、进化到监控的闭环协同"
+,"description": "以统一情报语义和统一情报底座支撑从识别、研判、响应、进化到监控的闭环协同。当前智能编排已演化为 DIFY 多工作流入口，标准化通知通道仍是待恢复的目标能力。"
 },
 {
 "id": "1222",
@@ -151,7 +181,7 @@
 ,"attributes": [
 {
 "name": "userstory",
-"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\design\\\\userstories\\\\value_stream_aligned\\\\VS3-E2E_动态知识进化闭环_端到端用户故事.md\n\n# VS3-E2E 动态知识进化闭环端到端用户故事\r\n\r\n> 前置依赖约定：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent、OPENCTI、Notification MCP 与 STIX 2.1 的统一约束。\r\n\r\n## 1、概要\r\n\r\n本故事面向情报分析师与管理层情报消费者，描述在重大外部漏洞或零日事件出现后，系统如何先将外部情报统一接入内部 OPENCTI，再由 DIFY Agent 仅从内部 OPENCTI 拉取标准化 STIX 情报与内部资产图谱进行融合，生成对企业有意义的影响范围、优先级和决策建议。这里的关键不是“外部平台直接驱动 Agent”，而是由 OPENCTI 作为唯一内部情报底座，把外部 `Vulnerability` 进化为企业内部可执行的 `Opinion`、`Note` 和关系图谱。\r\n\r\n## 2、执行全景图 (DIFY & OPENCTI 协作流)\r\n\r\n```mermaid\r\nsequenceDiagram\r\n    actor Analyst as 情报分析师\r\n    actor Consumer as 情报消费者(CISO/管理层)\r\n    participant Feed as 外部情报源\r\n    participant CTI as OPENCTI Platform\r\n    participant Agent as DIFY Agent(ai4sec_agent)\r\n    participant OpenCTIMCP as ai4sec_opencti_mcp\r\n    participant Notify as Notification MCP\r\n\r\n    Analyst->>CTI: 配置采集源映射、融合规则和影响评分阈值\r\n    Note right of Analyst: 配置对象:\\nVulnerability{name, external_references}\\nOpinion{opinion, explanation}\r\n\r\n    Feed->>CTI: 推送外部漏洞公告与原始 STIX Bundle\r\n    Note right of Feed: 外部仅对接内部 OPENCTI:\\nVulnerability{name, description, cvss_score}\\nReport{name, published, object_refs}\r\n\r\n    CTI-->>Agent: 通过内部事件或任务触发待研判情报\r\n    Note left of CTI: 提供给 Agent 的内部情报:\\nBundle{id, objects[]}\\nVulnerability{name, description, cvss_score}\r\n\r\n    Agent->>OpenCTIMCP: 查询内部 SBOM、资产和业务关键度\r\n    OpenCTIMCP->>CTI: 按 Software、Infrastructure、Identity 检索关联\r\n    CTI-->>OpenCTIMCP: 返回内部图谱片段\r\n    Note left of CTI: 返回对象:\\nSoftware{name, version, cpe}\\nInfrastructure{name, environment}\\nIdentity{name, sector}\r\n    OpenCTIMCP-->>Agent: 返回受影响范围与资产归属\r\n\r\n    Agent->>Agent: 执行融合推理与企业影响分层\r\n    Note right of Agent: 推理输出:\\nRelationship{relationship_type=\"affects\"}\\nOpinion{opinion, explanation}\\nNote{abstract, content}\r\n\r\n    Agent->>OpenCTIMCP: 写回企业化影响结果与建议动作\r\n    OpenCTIMCP->>CTI: 持久化融合后的 Bundle\r\n    Note left of CTI: 输出对象:\\nVulnerability{name, x_opencti_score}\\nRelationship{source_ref, target_ref, relationship_type=\"affects\"}\\nOpinion{opinion, explanation}\r\n\r\n    Agent->>Notify: 发送管理层决策摘要\r\n    Notify-->>Consumer: 下发影响面、优先级和窗口期建议\r\n    Consumer->>CTI: 查看受影响资产清单与证据关系\r\n```\r\n\r\n## 3、故事：外部零日被快速转化为管理层可执行结论\r\n\r\n### 第一幕：情报分析师启动外部情报融合\r\n\r\n外部情报源推送一条新的高危零日公告，但该情报并不直接进入 DIFY Agent，而是先通过既定对接方式进入内部 OPENCTI。情报分析师预先在 OPENCTI 侧定义了采集源映射、评分阈值和融合规则，因此系统先沉淀 `Vulnerability{name=\"CVE-2026-XXXX\", cvss_score=9.8}` 与 `Report{name=\"0day-advisory\", published=\"2026-03-13T08:00:00Z\"}` 等对象，再由内部流程将待研判情报提供给 Agent。\r\n\r\n### 第二幕：DIFY Agent 将外部漏洞映射到内部资产图谱\r\n\r\nDIFY Agent 只通过 `ai4sec_opencti_mcp` 从内部 OPENCTI 拉取标准化后的 `Vulnerability`、`Report` 以及内部 `Software`、`Infrastructure` 和 `Identity` 关系，识别哪些生产系统、业务负责人和外网暴露资产正在使用受影响组件。随后 Agent 把从 OPENCTI 获取的漏洞对象与内部资产图谱融合，生成新的 `Relationship{relationship_type=\"affects\"}`，并补充 `Opinion` 说明为什么该漏洞在企业语境下需要被提升优先级。\r\n\r\n### 第三幕：管理层收到可决策的摘要而不是原始噪声\r\n\r\n系统把融合后的 `Vulnerability`、`Opinion` 和 `Note` 写入 OPENCTI，并通过 Notification MCP 直接发送给 CISO 和相关管理者。收到的不是原始 CVE，而是“受影响资产有哪些、业务窗口期多久、优先修补哪些系统、哪些系统先做隔离”的企业级结论，管理层可以直接进入 OPENCTI 核验对象关系与影响证据。\r\n"
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\design\\\\userstories\\\\value_stream_aligned\\\\VS3-E2E_动态知识进化闭环_端到端用户故事.md\n\n# VS3-E2E 动态知识进化闭环端到端用户故事\n\n> 前置依赖约定：本用户故事默认继承并遵循 [00_通用架构约束与工具规范.md](./00_通用架构约束与工具规范.md) 中关于 DIFY Agent、OPENCTI、Notification MCP 与 STIX 2.1 的统一约束。\n\n## 1、概要\n\n本故事面向情报分析师与管理层情报消费者，描述在重大外部漏洞或零日事件出现后，系统如何先将外部情报统一接入内部 OPENCTI，再由 DIFY Agent 仅从内部 OPENCTI 拉取标准化 STIX 情报与内部资产图谱进行融合，生成对企业有意义的影响范围、优先级和决策建议。这里的关键不是“外部平台直接驱动 Agent”，而是由 OPENCTI 作为唯一内部情报底座，把外部 `Vulnerability` 进化为企业内部可执行的 `Opinion`、`Note` 和关系图谱。\n\n## 2、执行全景图 (DIFY & OPENCTI 协作流)\n\n```mermaid\nsequenceDiagram\n    actor Analyst as 情报分析师\n    actor Consumer as 情报消费者(CISO/管理层)\n    participant Feed as 外部情报源\n    participant CTI as OPENCTI Platform\n    participant Agent as DIFY Agent(ai4sec_agent)\n    participant OpenCTIMCP as ai4sec_opencti_mcp\n    participant Notify as Notification MCP\n\n    Analyst->>CTI: 配置采集源映射、融合规则和影响评分阈值\n    Note right of Analyst: 配置对象:\\nVulnerability{name, external_references}\\nOpinion{opinion, explanation}\n\n    Feed->>CTI: 推送外部漏洞公告与原始 STIX Bundle\n    Note right of Feed: 外部仅对接内部 OPENCTI:\\nVulnerability{name, description, cvss_score}\\nReport{name, published, object_refs}\n\n    CTI-->>Agent: 通过内部事件或任务触发待研判情报\n    Note left of CTI: 提供给 Agent 的内部情报:\\nBundle{id, objects[]}\\nVulnerability{name, description, cvss_score}\n\n    Agent->>OpenCTIMCP: 查询内部 SBOM、资产和业务关键度\n    OpenCTIMCP->>CTI: 按 Software、Infrastructure、Identity 检索关联\n    CTI-->>OpenCTIMCP: 返回内部图谱片段\n    Note left of CTI: 返回对象:\\nSoftware{name, version, cpe}\\nInfrastructure{name, environment}\\nIdentity{name, sector}\n    OpenCTIMCP-->>Agent: 返回受影响范围与资产归属\n\n    Agent->>Agent: 执行融合推理与企业影响分层\n    Note right of Agent: 推理输出:\\nRelationship{relationship_type=\"affects\"}\\nOpinion{opinion, explanation}\\nNote{abstract, content}\n\n    Agent->>OpenCTIMCP: 写回企业化影响结果与建议动作\n    OpenCTIMCP->>CTI: 持久化融合后的 Bundle\n    Note left of CTI: 输出对象:\\nVulnerability{name, x_opencti_score}\\nRelationship{source_ref, target_ref, relationship_type=\"affects\"}\\nOpinion{opinion, explanation}\n\n    Agent->>Notify: 发送管理层决策摘要\n    Notify-->>Consumer: 下发影响面、优先级和窗口期建议\n    Consumer->>CTI: 查看受影响资产清单与证据关系\n```\n\n## 3、故事：外部零日被快速转化为管理层可执行结论\n\n### 第一幕：情报分析师启动外部情报融合\n\n外部情报源推送一条新的高危零日公告，但该情报并不直接进入 DIFY Agent，而是先通过既定对接方式进入内部 OPENCTI。情报分析师预先在 OPENCTI 侧定义了采集源映射、评分阈值和融合规则，因此系统先沉淀 `Vulnerability{name=\"CVE-2026-XXXX\", cvss_score=9.8}` 与 `Report{name=\"0day-advisory\", published=\"2026-03-13T08:00:00Z\"}` 等对象，再由内部流程将待研判情报提供给 Agent。\n\n### 第二幕：DIFY Agent 将外部漏洞映射到内部资产图谱\n\nDIFY Agent 只通过 `ai4sec_opencti_mcp` 从内部 OPENCTI 拉取标准化后的 `Vulnerability`、`Report` 以及内部 `Software`、`Infrastructure` 和 `Identity` 关系，识别哪些生产系统、业务负责人和外网暴露资产正在使用受影响组件。随后 Agent 把从 OPENCTI 获取的漏洞对象与内部资产图谱融合，生成新的 `Relationship{relationship_type=\"affects\"}`，并补充 `Opinion` 说明为什么该漏洞在企业语境下需要被提升优先级。\n\n### 第三幕：管理层收到可决策的摘要而不是原始噪声\n\n系统把融合后的 `Vulnerability`、`Opinion` 和 `Note` 写入 OPENCTI，并通过 Notification MCP 直接发送给 CISO 和相关管理者。收到的不是原始 CVE，而是“受影响资产有哪些、业务窗口期多久、优先修补哪些系统、哪些系统先做隔离”的企业级结论，管理层可以直接进入 OPENCTI 核验对象关系与影响证据。\n"
 },
 {
 "name": "userstory2",
@@ -231,11 +261,11 @@
 "name": "Notification MCP"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/Notification MCP"
-,"description": "FastAPI notification service that previews or dispatches standardized AI4SEC notifications through an environment-driven SMTP configuration. The current implementation computes escalation windows and deduplication keys, appends a default formal recipient, and performs real email dispatch only when preview mode is disabled.\r\n"
+,"description": "Retired repository-local notification service. The FastAPI runtime implementation and repository-local call chain were removed on 2026-03-19. Standardized notification remains an architecture goal, but this element no longer represents an active runtime service in the repository.\r\n"
 ,"attributes": [
 {
 "name": "code_paths"
-,"description": "[\"mcp/notification_mcp/app/main.py\", \"mcp/notification_mcp/app/service.py\", \"mcp/notification_mcp/app/settings.py\", \"mcp/notification_mcp/app/models.py\"]"
+,"description": "[]"
 },
 {
 "name": "配置参数"
@@ -246,27 +276,42 @@
 ,"description": "本地DOCKER容器"
 }
 ]
+,"project_info": {
+"tasks": [
+{
+"name": "remove"
+,"type": "ToDo"
+,"status": "Active"
+,"description": "remove this element and related codes.\r\n- 先仅移除运行时服务与调用；模板资产单独评估。\r\n- 高风险/中断级通知已替代\r\n- 外部系统不仍依赖 Notification MCP API。"
+,"start_date": "2026-3-19"
+,"due_date": "1899-12-30"
+,"reporter": "derek"
+,"priority": "Low",
+"assigned_to": "llm"
+}
+]
+}
 },
 {
 "id": "1228",
 "name": "全局情报底座：OPENCTI 平台"
 ,"type": "ArchiMate_Principle"
 ,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/全局情报底座：OPENCTI 平台"
-,"description": "1、推送到DIFY Agent(ai4sec_agent)的情报都来自内部的OPENCTI平台；\r\n2、外部情报平台只能对接内部的OPENCTI平台，且内部OPENCTI平台通过config/opencti_webhook_signal_template.ejs向dify agent推送；"
+,"description": "1、推送到 DIFY 工作流的情报都来自内部 OPENCTI 平台；\r\n2、外部情报平台只能对接内部 OPENCTI 平台，内部 OPENCTI 再通过已配置的 webhook 向保留的 Dify Workflow 推送事件；"
 },
 {
 "id": "1229",
 "name": "统一智能入口：DIFY Agent (ai4sec_agent)"
 ,"type": "ArchiMate_Principle"
 ,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/统一智能入口：DIFY Agent (ai4sec_agent)"
-,"description": "主动交互：情报分析师及消费者通过 Dify 平台界面的对话式 Agent 直接进行自然语言沟通以启停复杂验证与推理操作。\r\n无感被动流转：在遇到外部告警或流水线集成时，外部事件主动通过 Webhook 等方式发起调用，Dify Agent 将作为自动化调度的“大脑”控制所有工具组件流转。"
+,"description": "主动交互：情报分析师及消费者通过 Dify 平台界面的场景化 Workflow 进行自然语言交互与推理操作。\r\n无感被动流转：在遇到外部告警或流水线集成时，外部事件通过 Webhook 等方式触发对应 Dify Workflow。当前原则保留“统一编排平台”含义，但不再假设所有路径收敛到单一 ai4sec_agent。"
 },
 {
 "id": "1230",
 "name": "通知预警标准化通道"
 ,"type": "ArchiMate_Principle"
 ,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/通知预警标准化通道"
-,"description": "当最终环节产生高级别预警需送达情报消费者时，一律交由 Notification MCP 组件承担。该组件由环境配置项（如 ALERT_RECIPIENT）动态控制通知链路与邮件投派。"
+,"description": "当最终环节产生高级别预警需送达情报消费者时，应通过标准化通知能力统一承载。Notification MCP 的仓库内实现已退役，因此该原则当前表达的是目标能力边界，而非现役运行时拓扑。"
 },
 {
 "id": "1231",
@@ -580,7 +625,7 @@
 "name": "平台级 1 组结果"
 ,"type": "ArchiMate_Outcome"
 ,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/平台级 1 组结果"
-,"description": "AI4SEC 平台形成一个以 OPENCTI 为统一事实底座、以 DIFY Agent 为统一智能入口、以 Notification MCP 为统一结果送达通道的情报生产与消费闭环，使威胁建模、威胁运营响应、动态知识进化、环境感知监控四类场景都能够在统一语义、统一入口和统一反馈机制下快速产生可执行结论。"
+,"description": "AI4SEC 平台形成一个以 OPENCTI 为统一事实底座、以 DIFY 为统一编排平台的情报生产与消费闭环。当前仓库运行时保留多工作流入口，标准化通知与统一结果送达通道仍属于待恢复的后续能力。"
 },
 {
 "id": "1270",
@@ -594,7 +639,7 @@
 "name": "建立统一智能交互与编排入口"
 ,"type": "ArchiMate_CourseOfAction"
 ,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/建立统一智能交互与编排入口"
-,"description": "所有角色主动交互、内部事件触发、外部 webhook 调度统一通过 DIFY Agent 承接，由 Agent 协调 MCP、知识与通知能力。"
+,"description": "所有角色主动交互、内部事件触发、外部 webhook 调度统一由 DIFY 平台承接；当前可由多个场景化 Workflow 分别落地，而不是强制收敛到单一 Agent。"
 },
 {
 "id": "1272",
@@ -608,7 +653,7 @@
 "name": "建立统一结果送达与反馈回灌机制"
 ,"type": "ArchiMate_CourseOfAction"
 ,"browser_path": "Model/System/StrategyLayerAndMotivationAspect/StrategyLayerAndMotivationAspect/建立统一结果送达与反馈回灌机制"
-,"description": "将发布判定、响应动作、影响摘要、监控结果通过 Notification MCP 统一送达，并把执行结果与命中反馈重新沉淀为平台知识资产。"
+,"description": "将发布判定、响应动作、影响摘要、监控结果通过标准化结果送达能力统一输出，并把执行结果与命中反馈重新沉淀为平台知识资产。当前仓库内未保留 Notification MCP 运行时实现。"
 },
 {
 "id": "1274",
@@ -630,7 +675,7 @@
 },
 {
 "name": "code_paths"
-,"description": "[\"externalDify/docker-compose.yaml\", \"DifyAgentWorkflow/ai4sec_unified_workflow.yaml\", \"DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml\"]"
+,"description": "[\"externalDify/docker-compose.yaml\", \"DifyAgentWorkflow/ai4sec_unified_workflow.yaml\", \"DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml\", \"DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml\"]"
 },
 {
 "name": "DIFY版本"
@@ -667,7 +712,7 @@
 },
 {
 "name": "opencti_webhook_signal_template",
-"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\external_opencti\\\\opencti_webhook_signal_template.ejs\n\n{\r\n  \"type\": \"bundle\",\r\n  \"id\": \"bundle--<%= (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000' %>\",\r\n  \"spec_version\": \"2.1\",\r\n  \"objects\": [\r\n    <% \r\n    function isList(v) {\r\n      return !!(v && typeof v.length === 'number' && typeof v.forEach === 'function');\r\n    }\r\n\r\n    if (isList(notification_content) && notification_content.length > 0) {\r\n      notification_content.forEach(function(group, groupIndex) {\r\n        if (group && isList(group.events) && group.events.length > 0) {\r\n          group.events.forEach(function(event, eventIndex) {\r\n            \r\n            // We ensure we have an ID to look up later\r\n            var targetId = event.instance_id || (event.instance ? event.instance.id : null);\r\n            var targetStandardId = event.instance ? event.instance.standard_id : (targetId);\r\n\r\n            // OpenCTI template test may call startsWith on ID fields internally.\r\n            // Ensure every emitted ID is always a defined string with a STIX-like prefix.\r\n            var fallbackUuid = (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000';\r\n            var rawTargetId = targetId ? ('' + targetId) : '';\r\n            var rawStandardId = targetStandardId ? ('' + targetStandardId) : '';\r\n            var safeStandardId = rawStandardId || rawTargetId || ('vulnerability--' + fallbackUuid);\r\n            if (typeof safeStandardId !== 'string') {\r\n              safeStandardId = '' + (safeStandardId || '');\r\n            }\r\n            if (safeStandardId.indexOf('vulnerability--') !== 0) {\r\n              safeStandardId = 'vulnerability--' + safeStandardId;\r\n            }\r\n\r\n            var safeLookupId = rawTargetId || rawStandardId || fallbackUuid;\r\n    %>\r\n    {\r\n      \"type\": \"vulnerability\",\r\n      \"id\": \"<%= safeStandardId %>\",\r\n      \"created\": \"<%= new Date().toISOString() %>\",\r\n      \"modified\": \"<%= new Date().toISOString() %>\",\r\n      \r\n      <% /* 1. SIGNAL NAME: Tells your system this is just a signal */ %>\r\n      \"name\": \"[SIGNAL] Lookup Required for: <%= (event.message || 'Unknown Event').replace(/\"/g, '\\\\\"') %>\",\r\n      \r\n      <% /* 2. DESCRIPTION: Operation type */ %>\r\n      \"description\": \"Operation: <%= event.operation || 'unknown' %>\",\r\n      \r\n      <% /* 3. CRITICAL DATA FOR LOOKUP: The raw UUID */ %>\r\n      \"x_opencti_id\": \"<%= safeLookupId %>\",\r\n      \r\n      <% /* 4. FLAG: Tells your code to ignore this body and query the API */ %>\r\n      \"x_opencti_lookup_required\": true,\r\n\r\n      \"labels\": [\"notification-signal\"]\r\n    }\r\n    <% \r\n            /* Add comma if not the last item */\r\n                if (groupIndex !== notification_content.length - 1 || eventIndex !== group.events.length - 1) {\r\n    %>,<% \r\n            }\r\n          }); \r\n        }\r\n      });\r\n    } \r\n    %>\r\n  ]\r\n}"
+"content": "Relative File Path:D:\\\\projects\\\\AI4X\\\\AI4X-Platform-dify\\\\external_opencti\\\\opencti_webhook_signal_template.ejs\n\n<%\r\nvar DEFAULT_OBJECT_ID = 'vulnerability--693c68fd-9a33-5d6d-b44e-407b6a48b05b';\r\nvar DEFAULT_OBJECT_UUID = '693c68fd-9a33-5d6d-b44e-407b6a48b05b';\r\n%>\r\n{\r\n  \"type\": \"bundle\",\r\n  \"id\": \"bundle--<%= (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000' %>\",\r\n  \"spec_version\": \"2.1\",\r\n  \"objects\": [\r\n    <% \r\n    function isList(v) {\r\n      return !!(v && typeof v.length === 'number' && typeof v.forEach === 'function');\r\n    }\r\n\r\n    function isVulnerabilityStixId(value) {\r\n      return typeof value === 'string' && value.indexOf('vulnerability--') === 0;\r\n    }\r\n\r\n    if (isList(notification_content) && notification_content.length > 0) {\r\n      notification_content.forEach(function(group, groupIndex) {\r\n        if (group && isList(group.events) && group.events.length > 0) {\r\n          group.events.forEach(function(event, eventIndex) {\r\n            \r\n            // We ensure we have an ID to look up later\r\n            var targetId = event.instance_id || (event.instance ? event.instance.id : null);\r\n            var targetStandardId = event.instance ? event.instance.standard_id : (targetId);\r\n\r\n            // OpenCTI template test may call startsWith on ID fields internally.\r\n            // Ensure every emitted ID is always a defined string with a STIX-like prefix.\r\n            var fallbackUuid = (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000';\r\n            var rawTargetId = targetId ? ('' + targetId) : '';\r\n            var rawStandardId = targetStandardId ? ('' + targetStandardId) : '';\r\n            var safeStandardId = DEFAULT_OBJECT_ID;\r\n            if (isVulnerabilityStixId(rawStandardId)) {\r\n              safeStandardId = rawStandardId;\r\n            } else if (isVulnerabilityStixId(rawTargetId)) {\r\n              safeStandardId = rawTargetId;\r\n            }\r\n\r\n            var safeLookupId = DEFAULT_OBJECT_ID;\r\n            if (isVulnerabilityStixId(rawStandardId)) {\r\n              safeLookupId = rawStandardId;\r\n            } else if (isVulnerabilityStixId(rawTargetId)) {\r\n              safeLookupId = rawTargetId;\r\n            }\r\n    %>\r\n    {\r\n      \"type\": \"vulnerability\",\r\n      \"id\": \"<%= safeStandardId %>\",\r\n      \"created\": \"<%= new Date().toISOString() %>\",\r\n      \"modified\": \"<%= new Date().toISOString() %>\",\r\n      \r\n      <% /* 1. SIGNAL NAME: Tells your system this is just a signal */ %>\r\n      \"name\": \"[SIGNAL] Lookup Required for: <%= (event.message || 'Unknown Event').replace(/\"/g, '\\\\\"') %>\",\r\n      \r\n      <% /* 2. DESCRIPTION: Operation type */ %>\r\n      \"description\": \"Operation: <%= event.operation || 'unknown' %>\",\r\n      \r\n      <% /* 3. CRITICAL DATA FOR LOOKUP: The raw UUID */ %>\r\n      \"x_opencti_id\": \"<%= safeLookupId %>\",\r\n      \r\n      <% /* 4. FLAG: Tells your code to ignore this body and query the API */ %>\r\n      \"x_opencti_lookup_required\": true,\r\n\r\n      \"labels\": [\"notification-signal\"]\r\n    }\r\n    <% \r\n            /* Add comma if not the last item */\r\n                if (groupIndex !== notification_content.length - 1 || eventIndex !== group.events.length - 1) {\r\n    %>,<% \r\n            }\r\n          }); \r\n        }\r\n      });\r\n    } \r\n    %>\r\n  ]\r\n}"
 }
 ]
 },
@@ -676,39 +721,13 @@
 "name": "WEBHOOK_AGENT"
 ,"type": "Class"
 ,"browser_path": "Model/System/ApplicationLayer/ApplicationLayer/WEBHOOK_AGENT"
-,"description": "Webhook-oriented Dify workflow asset that receives OpenCTI-originated events, routes them into AI4SEC scenario processing, and reuses shared runtime tool logic for signal resolution, scenario routing, and downstream notification preparation."
+,"description": "s OpenCTI-originated STIX bundle push events, normalizes the incoming payload through an inline code node, queries related infrastructure and vulnerability context directly from OpenCTI GraphQL (OPENCTI_GRAPHQL_URL, port 8080) via an HTTP request node, analyzes one-hop asset relationships, computes a contextualized AI4SEC Risk Score (CVSS base x asset criticality x exposure x threat-intel multipliers, 1-100 range), maps the score to a severity_tier (Critical/High/Medium/Low), and returns a structured analysis output (severity_tier, risk_score, recommended_action, business_impact_summary) in-session. This workflow does not route through ai4sec_opencti_mcp and does not emit notifications via Notification MCP; per design specification, high-risk results are returned as structured inline output only."
 ,"attributes": [
 {
 "name": "code_paths"
-,"description": "[\"DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml\", \"DifyAgentWorkflow/tools/ai4sec_runtime_tools.py\"]"
+,"description": "[\"DifyAgentWorkflow/ai4sec_opencti_webhook_workflow.yaml\"]"
 }
 ]
-,"project_info": {
-"tasks": [
-{
-"name": "i need webhook agent access the opencti platform with a http node in the workflow instead of the current seperate opencti mcp."
-,"type": "ToDo"
-,"status": "Active"
-,"description": "- 直连 OpenCTI 时应使用 GraphQL 接口，以 ai4sec_threat_modeling_agent（1436）现有直连查询路径作为对齐基线，若 webhook 场景确有额外字段需求，必须在实现说明中显式列出差异。\r\n- 工作流内 HTTP 节点所需的认证注入方式、秘钥管理方式采用明文方式，优先复用现有 VS1 直连工作流的 OPENCTI_GRAPHQL_URL / OPENCTI_ADMIN_TOKEN 命名；如果 webhook 工作流不能完全复用，需把差异标注为实现假设。\r\n- 在 ai4sec_opencti_webhook_workflow.yaml 中定位当前 MCP 工具调用节点，以此节点承接 GraphQL HTTP 请求。\r\n- 迁移后需要的最小字段集合和关系深度和失败重试语义先按 1436 基线实现，仅当 webhook 下游确有缺口时再补字段，并逐项说明用途。\r\n- 需要对 HTTP 查询结果做与现有兼容服务完全相同的投影合同，先以现有兼容服务返回合同为准做一一对齐，新增字段必须说明用途与下游消费者。\r\n- 只移除 WEBHOOK_AGENT 的运行时依赖，不默认删除或改写 ai4sec_opencti_mcp 其他兼容路径。\r\n- HTTP 节点失败重试、超时与错误码在以当前工作流实际可配置能力为上限，不额外引入仓外补偿逻辑。"
-,"start_date": "2026-3-18"
-,"due_date": "1899-12-30"
-,"reporter": "derek"
-,"priority": "Low",
-"assigned_to": "llm"
-},
-{
-"name": "i need that the webhook agent analyzes the infrastrctures related with the notified vulurability pushed from opencti to give out the the impact on our product, and the risk score."
-,"type": "ToDo"
-,"status": "Active"
-,"description": "- 建议输出与业务层（1208）定义的关键业务对象和 KPI 对齐的结构化摘要，至少包含：影响范围 (Affected Infrastructures/Products)、优先级建议 (Priority Recommendation) 和 决策摘要 (Decision Summary)。优先使用一跳对象本身及其名称作为产品影响候选；若无法稳定归一，输出为“需人工确认”的影响对象清单。固定使用结构化字段输出，先给出 severity_tier、risk_score、recommended_action 与 business_impact_summary 四类核心字段。\r\n- 建议从“一跳关联”开始，即只查询与漏洞直接关联的 Infrastructure 和 Software 、system实体。\r\n- 高风险结果不需要升级或通知协同出口\r\n- 最佳实践是基于行业标准（CVSS）进行技术严重性评估，然后利用企业内部的**业务上下文（Business Context）和威胁情报（Threat Intelligence）**对其进行加权和调整，最终得出一个真正反映该漏洞对“我”企业风险的“情境化风险评分”。\r\n### 1. 风险评分的量纲：建议采用 1-100 分的数值评分体系\r\n**计算公式建议（示例）：**\r\n`AI4SEC Risk Score = (CVSS Base Score * 10) * Asset_Criticality_Multiplier * Exposure_Multiplier * Threat_Intel_Multiplier`\r\n*   **CVSS Base Score * 10**: 将 CVSS 基础分（0-10）映射到 0-100 的基准。\r\n*   **Asset Criticality Multiplier (资产关键度乘数)**:\r\n    *   核心业务资产（如支付网关）：**1.5**\r\n    *   重要业务资产（如用户中心）：**1.2**\r\n    *   一般资产：**1.0**\r\n    *   非关键资产（如测试服务器）：**0.8**\r\n*   **Exposure Multiplier (暴露面乘数)**:\r\n    *   面向互联网直接暴露：**1.5**\r\n    *   面向内网，但可从办公网段访问：**1.1**\r\n    *   隔离环境/核心生产区：**0.9**\r\n*   **Threat Intel Multiplier (威胁情报乘数)**:\r\n    *   已确认有在野利用（Active Exploitation）：**2.0**\r\n    *   已有公开PoC，但无在野利用证据：**1.5**\r\n    *   无公开利用代码：**1.0**\r\n缺失乘数视为 1.0，并在输出中显式标注缺失项，避免阻塞链路。先完成一跳取数与最小评分链路，再按缺口补充必要字段，而不是预先扩大全图查询范围。\r\n### 2. 分档规则：基于 1-100 分的数值范围进行划分\r\n\r\n将最终计算出的 `AI4SEC Risk Score` 映射到您系统中已有的 `severity_tier`。\r\n\r\n| 数值范围 | 风险等级 (Severity Tier) | 英文标识 | 业务定义 |\r\n| :--- | :--- | :--- | :--- |\r\n| **90 - 100+** | **中断级** | `Critical` | 对核心业务构成直接、即时的中断威胁；或存在已被积极利用的高危漏洞。 |\r\n| **70 - 89** | **高** | `High` | 严重影响关键业务功能、可能导致数据泄露或系统权限丢失，需要紧急处理。 |\r\n| **40 - 69** | **中** | `Medium` | 可能对业务造成一定影响，或利用条件较为苛刻，应在常规补丁周期内修复。 |\r\n| **1 - 39** | **低/信息** | `Low / Normal` | 风险较低，影响有限，可机会性修复或接受风险。 |\r\n### 3. 阈值口径：将风险等级直接与处置动作和 SLA 挂钩\r\n\r\n阈值不仅仅是一个数字，它更是行动的触发器。\r\n\r\n| 风险等级 | 处置动作阈值 (Action Threshold) | 建议的处置服务等级协议 (SLA) |\r\n| :--- | :--- | :--- |\r\n| **中断级 (Critical)** | **立即行动**：触发自动化响应（如虚拟补丁、防火墙封禁）、创建最高优先级（P0）事件单、**立即通知**管理层（1234）和安全/业务负责人。 | **24小时内**完成初步缓解，**7天内**完成根除。 |\r\n| **高 (High)** | **紧急处理**：创建高优先级（P1）事件单，由**安全运营团队（1235）**主导响应，并通知相关**业务负责人（1232）**。 | **72小时内**完成初步缓解，**30天内**完成根除。 |\r\n| **中 (Medium)** | **计划内修复**：进入常规漏洞管理或补丁管理流程，无需立即告警，由**情报分析师（1231）**跟踪。 | **90天内**完成修复。 |\r\n| **低/信息 (Low / Normal)** | **按需处理或接受风险**：归档记录，仅在有额外资源或作为其他修复任务的附加项时处理。 | **180天内**或定义为可接受风险。 |\r\n\r\n- OpenCTI 中存在业务关键度等信息，则用其加权计算风险；如果不存在，流程应能继续，但需在输出中明确标注“业务上下文缺失，风险评估可能不完整”。\r\n- 产品影响对象在 OpenCTI 中最终应优先落为 Infrastructure、Software 还是 system / Identity 投影，建议先以一跳对象名称作为候选，无法归一时输出“需人工确认”的对象清单。\r\n- severity_tier 先按任务给定阈值做独立映射，再与现有输出字段名保持一致。\r\n\r\n"
-,"start_date": "2026-3-18"
-,"due_date": "1899-12-30"
-,"reporter": "derek"
-,"priority": "Low",
-"assigned_to": "llm"
-}
-]
-}
 },
 {
 "id": "1279",
@@ -728,28 +747,13 @@
 ,"description": "[ \"DifyAgentWorkflow/ai4sec_threat_modeling_workflow.yaml\" ]"
 }
 ]
-,"project_info": {
-"tasks": [
-{
-"name": "add a new llm node responsible for summarize the current structure outpu into a graph and several tables"
-,"type": "ToDo"
-,"status": "Active"
-,"description": "1. render the visual graph representing the entities and relationships between them.\r\n2. print the tables with each table representing a type of entity, such as attack pattern, course of action, indicator, attack path etc.\r\n- 关系图的最终承载形式是 Mermaid，先以 STIX 对象名称和 relationship_type 生成最小关系图\r\n- 表格仅在会话中展示，不需要追加到当前 JSON 下载文件中，图表结果不需要单独文件或单独变量输出，把图表作为主分析结果，当前JSON放在后面作为附加展示段落\r\n- `indicator` 与 `attack path` 在当前 VS1 证据集中不会稳定存在，缺失时不显示即可\r\n- 新增 LLM 节点应放在现有主分析节点之后，LLM 节点负责摘要生成，必要时用后置代码节点做轻量格式整理，但不要反转主次职责。\r\n- 表格结果采用 Markdown 表格格式输出，默认使用最小公共列，例如 name、id、type、description、relationship_count；若某类型没有该列则按最小可展示列降级。\r\n"
-,"start_date": "2026-3-18"
-,"due_date": "1899-12-30"
-,"reporter": "derek"
-,"priority": "Low",
-"assigned_to": "llm"
-}
-]
-}
 },
 {
 "id": "1437",
-"name": ""
+"name": "VS1威胁建模分析执行对象"
 ,"type": "Object"
-,"browser_path": "Model/System/BusinessLayer/BusinessLayer/威胁建模闭环流程"
-,"description": "1、使用REPORT ID或NAME查询OPENCTI平台；\r\n2、接收到查询到结果后，对查询结果进行过滤，去掉和威胁分析无关的字段，只留下对于后续LLM分析有帮助的字段；\r\n3、使用发起LLM分析，并将分析结果反馈显示给用户；"
+,"browser_path": "Model/System/BusinessLayer/BusinessLayer/威胁建模闭环流程/VS1威胁建模分析执行对象"
+,"description": "Business-layer execution artifact that represents the VS1 threat-modeling analysis contract as realized by the standalone Dify workflow (ai4sec_threat_modeling_workflow.yaml). The workflow accepts a report name or report ID as input, resolves the effective reference through a code node, constructs a GraphQL query targeting OPENCTI_GRAPHQL_URL directly (no MCP), filters the returned STIX 2.1 object set to retain only threat-analysis-relevant fields, invokes an LLM node for structured threat-model JSON generation, and returns the result with an in-session download link."
 ,"attributes": [
 {
 "name": "code_paths"
@@ -1194,12 +1198,13 @@
 },
 {
 "id":"1129"
-,"statement":"WEBHOOK_AGENT --(access opencti stix data)--> ai4sec_opencti_mcp"
+,"statement":"WEBHOOK_AGENT --(access opencti stix data)--> OpenCTI Runtime Stack"
 ,"name":"access opencti stix data"
+,"description": "queries OpenCTI directly via an HTTP request node"
 ,"source_id":"1277"
-,"target_id":"1215"
+,"target_id":"1276"
 ,"source_name":"WEBHOOK_AGENT"
-,"target_name":"ai4sec_opencti_mcp"
+,"target_name":"OpenCTI Runtime Stack"
 },
 {
 "id":"1130"
@@ -1241,79 +1246,79 @@
 },
 {
 "id":"1136"
-,"statement":"情报分析师 --(Association)--> "
+,"statement":"情报分析师 --(Association)--> VS1威胁建模分析执行对象"
 ,"name":"Association"
 ,"source_id":"1231"
 ,"target_id":"1437"
 ,"source_name":"情报分析师"
-,"target_name":""
+,"target_name":"VS1威胁建模分析执行对象"
 },
 {
 "id":"1137"
-,"statement":"情报分析师 --(发起威胁建模)--> "
+,"statement":"情报分析师 --(发起威胁建模)--> VS1威胁建模分析执行对象"
 ,"name":"发起威胁建模"
 ,"description": "用户输入报告名称或ID：\r\n示例：\r\n1、报告名称：VPD DESIGN\r\n2、报告ID：report--ed90bfef-5bcd-534f-89f3-49a4a6bce1dd"
 ,"sequence": "2"
 ,"source_id":"1231"
 ,"target_id":"1437"
 ,"source_name":"情报分析师"
-,"target_name":""
+,"target_name":"VS1威胁建模分析执行对象"
 },
 {
 "id":"1138"
-,"statement":" --(Association)--> OpenCTI Runtime Stack"
+,"statement":"VS1威胁建模分析执行对象 --(Association)--> OpenCTI Runtime Stack"
 ,"name":"Association"
 ,"source_id":"1437"
 ,"target_id":"1276"
-,"source_name":""
+,"source_name":"VS1威胁建模分析执行对象"
 ,"target_name":"OpenCTI Runtime Stack"
 },
 {
 "id":"1139"
-,"statement":" --(发起数据查询)--> OpenCTI Runtime Stack"
+,"statement":"VS1威胁建模分析执行对象 --(发起数据查询)--> OpenCTI Runtime Stack"
 ,"name":"发起数据查询"
 ,"sequence": "3"
 ,"source_id":"1437"
 ,"target_id":"1276"
-,"source_name":""
+,"source_name":"VS1威胁建模分析执行对象"
 ,"target_name":"OpenCTI Runtime Stack"
 },
 {
 "id":"1144"
-,"statement":"OpenCTI Runtime Stack --(Association)--> "
+,"statement":"OpenCTI Runtime Stack --(Association)--> VS1威胁建模分析执行对象"
 ,"name":"Association"
 ,"source_id":"1276"
 ,"target_id":"1437"
 ,"source_name":"OpenCTI Runtime Stack"
-,"target_name":""
+,"target_name":"VS1威胁建模分析执行对象"
 },
 {
 "id":"1145"
-,"statement":"OpenCTI Runtime Stack --(查询结果)--> "
+,"statement":"OpenCTI Runtime Stack --(查询结果)--> VS1威胁建模分析执行对象"
 ,"name":"查询结果"
 ,"sequence": "6"
 ,"source_id":"1276"
 ,"target_id":"1437"
 ,"source_name":"OpenCTI Runtime Stack"
-,"target_name":""
+,"target_name":"VS1威胁建模分析执行对象"
 },
 {
 "id":"1146"
-,"statement":" --(Association)--> 情报分析师"
+,"statement":"VS1威胁建模分析执行对象 --(Association)--> 情报分析师"
 ,"name":"Association"
 ,"source_id":"1437"
 ,"target_id":"1231"
-,"source_name":""
+,"source_name":"VS1威胁建模分析执行对象"
 ,"target_name":"情报分析师"
 },
 {
 "id":"1147"
-,"statement":" --(显示分析结果并提供结果下载)--> 情报分析师"
+,"statement":"VS1威胁建模分析执行对象 --(显示分析结果并提供结果下载)--> 情报分析师"
 ,"name":"显示分析结果并提供结果下载"
 ,"sequence": "7"
 ,"source_id":"1437"
 ,"target_id":"1231"
-,"source_name":""
+,"source_name":"VS1威胁建模分析执行对象"
 ,"target_name":"情报分析师"
 },
 {

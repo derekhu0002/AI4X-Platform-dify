@@ -49,10 +49,8 @@
 - **持久化与检索 (Dependencies):**
   - PostgreSQL、Weaviate/Qdrant 向量数据库，缓存库等独立容器。
 
-#### 3.1.3 模型协议扩展 (MCP Nodes)
-独立开发与部署的容器实例或本地进程，被 Dify Agent 通过 HTTP/SSE 持久连接集成。
-- **ai4sec_opencti_mcp:** 处理来自 Agent 的智能指令，转译裁剪查询/写入至 OpenCTI 的 GraphQL API。
-- **ai4sec_notification_mcp:** 将业务层发布的前后端协同事件派发，实现邮件/企微的标准化通信投递。
+#### 3.1.3 当前运行时边界
+截至 2026-03-19，仓库内不再部署独立 MCP Nodes。保留的 Dify Workflow 直接通过 HTTP 节点或代码节点访问 OpenCTI GraphQL；`mcp/opencti_mcp/` 与 `mcp/notification_mcp/` 仅保留退役后的兼容命名空间，不再构成可启动技术节点。
 
 ### 3.2 网络通讯与集成契约 (Communication Paths)
 
@@ -68,11 +66,6 @@ flowchart TD
             DifyAPI -->|TCP| DifyDB
         end
 
-        subgraph MCPNet[Docker Network - MCPs]
-            MCP1[ai4sec_opencti_mcp]
-            MCP2[Notification MCP]
-        end
-
         subgraph CTINet[Docker Network - OpenCTI]
             CTICore[OpenCTI Platform]
             CTIES[(Elasticsearch)]
@@ -83,9 +76,7 @@ flowchart TD
         end
         
         %% Inter-network communication
-        DifyAPI -->|SSE/HTTP| MCP1
-        DifyAPI -->|SSE/HTTP| MCP2
-        MCP1 -->|GraphQL| CTICore
+        DifyAPI -->|HTTP/GraphQL| CTICore
         CTICore -->|Webhook| DifyAPI
     end
 ```
@@ -93,13 +84,13 @@ flowchart TD
 ## 4. 特性声明与冲突对齐 (Alignment with Application Layer)
 
 ### 4.1 Progressive Disclosure (渐进式披露) 实现
-- 技术实现方面，底层 DB、Elasticsearch、Redis 均不直接对 `ai4sec_agent` 暴露暴露参数。Agent 的数据访问层统一收敛于 `ai4sec_opencti_mcp`。应用层不必感知 `dify_network` 到 `opencti_network` 间桥接路由跳数。
+- 技术实现方面，底层 DB、Elasticsearch、Redis 均不直接对 Dify 工作流暴露底层实现细节。当前保留工作流通过受控的 GraphQL 查询直接访问 OpenCTI，应用层不必感知 `dify_network` 到 `opencti_network` 间桥接路由跳数。
 
 ### 4.2 结构不变性原则
-- 所有应用层所设定的核心业务对象映射 (STIX 2.1) 均被保证不会遭受底层数据库结构影响。即使 `OpenCTI` 在底层运用 `Elasticsearch` 进行存储查询，通过 `ai4sec_opencti_mcp` 组件输出时依然保证是标准的 GraphQL Object 模型投影。
+- 所有应用层所设定的核心业务对象映射 (STIX 2.1) 均被保证不会遭受底层数据库结构影响。即使 `OpenCTI` 在底层运用 `Elasticsearch` 进行存储查询，保留 Workflow 仍只消费标准 GraphQL Object 模型投影，而不直接依赖底层存储结构。
 
 ### 4.3 预埋可演进能力
-- 考虑到应用层的 “价值流触发” 极度依赖 OpenCTI Webhook 以及外部 SIEM 告警（如 CI/CD pipeline 和告警数据），单机测试环境中要求 Dify API Gateway 需监听宿主机可内网穿透或可直接暴露的测试端口（如利用 Ngrok 或本地特权穿透桥）以便于联调。
+- 考虑到应用层的 “价值流触发” 极度依赖 OpenCTI Webhook 以及外部 SIEM 告警（如 CI/CD pipeline 和告警数据），单机测试环境中要求 Dify API Gateway 需监听宿主机可内网穿透或可直接暴露的测试端口（如利用 Ngrok 或本地特权穿透桥）以便于联调。若后续需要恢复标准化通知或统一入口，应作为新的独立技术节点重新部署，而不是假设旧 MCP 服务仍存在。
 
 ## 5. 资源需求建议
 

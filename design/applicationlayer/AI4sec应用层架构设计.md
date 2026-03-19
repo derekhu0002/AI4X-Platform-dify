@@ -8,7 +8,7 @@
 | --- | --- |
 | 上游输入 | StrategyLayerAndMotivationAspect（1207）、BusinessLayer（1208）、VS1（1223）、VS2（1225）、VS3（1222）、VS4（1224） |
 | 应用层目标 | 让业务角色通过 DIFY 这一 Agent 工作流编排平台高效消费情报、执行决策、触发编排，并保持 STIX 2.1 语义一致性 |
-| 核心组件 | DIFY（1212）、ai4sec_agent（1214）、ai4sec_opencti_mcp（1215）、OpenCTI platform（1216）、Notification MCP（1227） |
+| 核心组件 | DIFY（1212）、ai4sec_threat_modeling_agent（1436）、WEBHOOK_AGENT（1277）、OpenCTI platform（1216）；`ai4sec_agent`（1214）、`ai4sec_opencti_mcp`（1215）和 `Notification MCP`（1227）已于 2026-03-19 退役 |
 | 输出形式 | Markdown 文档；重点输出角色入口、应用服务、API/事件契约、通知合同 |
 | 非目标 | 不描述部署拓扑、RBAC、SMTP 参数、缓存结构、限流算法、GraphQL 实现代码 |
 
@@ -22,8 +22,8 @@
 | Separation of Concerns | 任务约束 + 业务层协作边界 | UI IA、Agent 编排、MCP 投影、OpenCTI 底座、通知合同分别描述，禁止混写 |
 | 业务流程中所有数据都必须是 OPENCTI 平台中的 STIX2.1 标准数据 | 原则 1226 | 所有同步接口和异步事件都用 STIX 对象或其业务投影表达 |
 | 全局情报底座：OPENCTI 平台 | 原则 1228 | 外部情报先进入 OpenCTI，再由内部事件或任务驱动 Agent |
-| 统一智能入口：DIFY Agent | 原则 1229 | 角色主动交互和被动 webhook 调度统一收敛到 ai4sec_agent |
-| 通知预警标准化通道 | 原则 1230 | 高级别结果统一通过 Notification MCP 下发 |
+| DIFY 统一编排平台 | 原则 1229 | 当前所有保留智能路径仍由 DIFY 承载，但已演化为多入口工作流而非单一 `ai4sec_agent` |
+| 通知预警标准化通道 | 原则 1230 | 标准化通知仍是架构目标，但当前仓库保留工作流不再内置 Notification MCP 运行时 |
 
 ### 2.2 应用层边界
 
@@ -49,12 +49,9 @@ flowchart LR
     DifyUI[Dify 平台 UI]
     Workbench[角色工作台]
     SceneCenter[场景中心]
-    Chatflow[Chatflow / Workflow]
-    Agent[ai4sec_agent]
-    Skill[SKILL]
-    MCP[ai4sec_opencti_mcp]
+    ThreatModel[VS1 Threat Modeling Workflow]
+    WebhookFlow[OpenCTI Webhook Workflow]
     CTI[OpenCTI Platform]
-    Notify[Notification MCP]
     Webhooks[Webhook 入口组]
 
     Analyst --> DifyUI
@@ -65,26 +62,24 @@ flowchart LR
 
     DifyUI --> Workbench
     DifyUI --> SceneCenter
-    Workbench --> Chatflow
-    SceneCenter --> Chatflow
-    Webhooks --> Chatflow
-    Chatflow --> Agent
-    Agent --> Skill
-    Agent --> MCP
-    MCP --> CTI
-    CTI --> Agent
-    Agent --> Notify
+    Workbench --> ThreatModel
+    SceneCenter --> ThreatModel
+    Webhooks --> WebhookFlow
+    ThreatModel --> CTI
+    WebhookFlow --> CTI
+    CTI --> ThreatModel
+    CTI --> WebhookFlow
 ```
 
 ### 3.2 视图 164 解析结果
 
 | 视图元素 / 关系 | 已确认语义 | 应用层含义 |
 | --- | --- | --- |
-| ai4sec_agent --(access opencti stix data)--> ai4sec_opencti_mcp | 关系 1082 | Agent 通过 MCP 访问经投影约束的 OpenCTI 数据 |
-| ai4sec_opencti_mcp --(access情报数据)--> OpenCTI platform | 关系 1083 | MCP 是 OpenCTI 查询/写回的统一访问面 |
-| OpenCTI platform --(主动推送STIX BUNDLE情报信息)--> ai4sec_agent | 关系 1086 | 内部事件与 webhook 回调从 OpenCTI 触发到 Agent |
-| 各类情报消费者 --(消费情报)--> ai4sec_agent | 关系 1088 | 消费者通过 Agent 消费情报，而非直连底层系统 |
-| ai4sec_agent --(发送预警通知)--> Notification MCP | 关系 1089 | 告警、审批、发布、监控通知统一由 Notification MCP 发送 |
+| ai4sec_threat_modeling_agent --(access opencti stix data)--> OpenCTI platform | 关系 1244 | VS1 保留工作流直接访问 OpenCTI GraphQL |
+| WEBHOOK_AGENT --(access opencti stix data)--> OpenCTI platform | 新增运行事实 | 漏洞 webhook 工作流直接访问 OpenCTI GraphQL |
+| OpenCTI platform --(主动推送STIX BUNDLE情报信息)--> WEBHOOK_AGENT | 当前运行事实 | OpenCTI 通过 webhook 触发保留的漏洞分析工作流 |
+| 各类情报消费者 --(消费情报)--> DIFY | 当前运行事实 | 分析师通过 Dify UI 进入具体工作流，而非通过统一 `ai4sec_agent` |
+| Notification MCP 相关关系 | 已退役 | 当前仓库中不再构成活跃运行时链路 |
 
 ## 4. 角色入口与信息架构
 
@@ -139,21 +134,21 @@ flowchart TD
 | 分层 | 主要职责 | 关键对象 / 能力 | 关联组件 |
 | --- | --- | --- | --- |
 | 体验层 | 承载工作台、场景中心、证据抽屉、通知中心 | 角色入口、页面 IA、审批动作 | Dify UI |
-| 会话与编排层 | 承载 Chatflow / Workflow 的自然语言交互、节点调度、异步编排 | 任务上下文、工作流状态、回查幂等 | DIFY + ai4sec_agent |
-| 应用服务层 | 把价值流抽象为统一场景服务 | 威胁建模、事件响应、漏洞影响、环境监控 | ai4sec_agent + SKILL |
-| 情报访问层 | 提供字段投影、分页、关系深度控制、写回边界 | STIX 投影、对象回查、关系裁剪 | ai4sec_opencti_mcp |
+| 会话与编排层 | 承载 Dify Workflow 的自然语言交互、节点调度、异步编排 | 会话上下文、工作流状态、webhook 输入 | DIFY + 保留 Workflow |
+| 应用服务层 | 由场景化工作流承载具体业务能力 | VS1 威胁建模、漏洞 webhook 风险分析 | ai4sec_threat_modeling_agent + WEBHOOK_AGENT |
+| 情报访问层 | 通过工作流节点直接访问 OpenCTI GraphQL | STIX 查询、对象回查、一跳关系分析 | Dify HTTP / Code Nodes |
 | 情报底座层 | 提供统一事实源和对象关系图谱 | STIX 2.1、GraphQL、Bundle | OpenCTI platform |
-| 通知输出层 | 发送发布判定、事件响应、漏洞预警、监控上线通知 | 模板、升级矩阵、幂等键 | Notification MCP |
+| 通知输出层 | 当前仓库未保留独立运行时；仅保留架构目标语义 | 标准化通知、升级矩阵、幂等键 | 待后续重新实现 |
 
 ### 5.2 Agent 工作流责任边界
 
 | 工作流阶段 | 输入 | 输出 | 应用层责任 |
 | --- | --- | --- | --- |
-| 受理与分流 | 用户交互、内部 webhook、OpenCTI 事件 | 标准化任务上下文 | 把主动入口和被动入口统一收敛到 Chatflow / Workflow |
-| 上下文回查 | 对象 ID、场景参数、角色视角 | MCP 投影结果 | 通过 MCP 工具节点回查上下文，不暴露缓存结构 |
-| 场景推理 | STIX 事实、业务上下文、历史知识 | 风险结论、规则草案、处置建议 | 把复杂推理放在 Chatflow / Workflow 的 Agent 节点和侧栏交互中 |
-| 结果沉淀 | 结论、证据、动作建议 | 写回 OpenCTI 的 STIX Bundle | 通过 MCP / 工具节点写回，保证对象满足 STIX 语义 |
-| 通知与反馈 | 发布结论、处置结果、规则上线结果 | 标准化通知与反馈事件 | 统一走 Notification MCP 节点并按严重级别升级 |
+| 受理与分流 | 分析师交互、OpenCTI webhook | 场景化输入上下文 | 按具体 Workflow 分别承接主动与被动入口 |
+| 上下文回查 | 对象 ID、报告引用、漏洞信号 | GraphQL 查询结果 | 通过 Dify HTTP / Code 节点直接查询 OpenCTI，不再经过仓库内 MCP |
+| 场景推理 | STIX 事实、业务上下文、历史知识 | 威胁建模 JSON、风险分数、业务影响摘要 | 把复杂推理放在具体 Workflow 的节点编排中 |
+| 结果沉淀 | 结论、证据、动作建议 | 当前以会话输出或 webhook 返回为主 | 仓库内未保留统一写回编排 |
+| 通知与反馈 | 高风险结果、处置结果、规则上线结果 | 当前未标准化 | Notification MCP 已退役，需后续重建 |
 
 ## 6. 价值流到应用层映射
 
@@ -164,18 +159,17 @@ flowchart TD
 | VS3 漏洞影响 | 漏洞影响 | 情报分析师、业务负责人、管理层 | Dify Chat 页面 + OpenCTI 事件触发 Workflow | 上下文、知识、通知 | 影响面、优先级、决策摘要 |
 | VS4 环境监控 | 环境监控 | 情报分析师、安全运营团队、安全负责人 | Dify Chat 页面 + OpenCTI 事件触发 Workflow | 任务、上下文、知识、通知 | 监控规则、上线通知、命中反馈 |
 
-## 7. DIFY 编排入口与统一契约
+## 7. DIFY 编排入口与当前契约
 
 ### 7.1 编排入口分组
 
 | 分组层级 | 编排入口 | 说明 |
 | --- | --- | --- |
-| 人机交互入口 | Dify Chat 页面 / 会话入口 | 情报分析师与各类消费者发起交互、审批与追问 |
-| 共享能力节点 | Task 节点 / Context 节点 / Knowledge 节点 / Notification 节点 | 在 Chatflow / Workflow 中复用共享能力 |
-| 场景工作流 | Threat Modeling Chatflow / Incident Response Workflow / Vulnerability Intelligence Workflow / Monitoring Rules Workflow | 四条价值流分别映射到独立工作流 |
-| 异步回调 | `/webhooks/opencti/*` | OpenCTI 到 Workflow 的内部事件入口 |
-| 异步回调 | `/webhooks/pipeline/*` | CI/CD、设计输出等工程入口 |
-| 异步回调 | `/webhooks/siem/*` | 观测系统、SIEM、NDR 入口 |
+| 人机交互入口 | Dify Chat 页面 / 会话入口 | 分析师手动进入 VS1 Threat Modeling Workflow |
+| 场景工作流 | Threat Modeling Workflow | 当前保留的主动交互工作流 |
+| 场景工作流 | OpenCTI Webhook Workflow | 当前保留的被动漏洞分析工作流 |
+| 异步回调 | OpenCTI webhook 入口 | OpenCTI 到 Webhook Workflow 的事件入口 |
+| 其他价值流入口 | 待后续实现 | VS2 / VS4 当前未保留仓库内运行时资产 |
 
 ### 7.2 统一契约规则
 
@@ -184,8 +178,8 @@ flowchart TD
 | 编排命名 | Workflow / Chatflow 名称与价值流场景保持一一对应，避免业务含义漂移 |
 | 版本策略 | 工作流版本由 DIFY 平台管理；异步事件命名使用 `ai4sec.<domain>.<event>.v1` |
 | 小版本策略 | 工作流小改动不更名，仅记录 `schema_revision` 或文档修订号 |
-| 认证方式 | 人机交互继承 DIFY 平台会话鉴权；Webhook 与 MCP 使用独立凭证，具体实现需人工确认 |
-| 幂等要求 | webhook 消费与通知发送使用 `dedup_key`；同一对象的重复触发不得重复落库 |
+| 认证方式 | 人机交互继承 DIFY 平台会话鉴权；Webhook Workflow 通过 OpenCTI 配置的入口和 `OPENCTI_ADMIN_TOKEN` 访问底座 |
+| 幂等要求 | webhook 消费仍需按对象维度去重；通知发送幂等暂不适用当前仓库运行时 |
 | 错误码规则 | 域前缀 + 四位数字 |
 
 ### 7.3 错误语义基线
@@ -202,7 +196,7 @@ flowchart TD
 | `UPSTREAM-5020` | OpenCTI 或外部上游异常 | 上游服务错误或不可用 |
 | `NOTIFY-5030` | 通知投递失败 | 通知通道不可达 |
 
-## 8. ai4sec_opencti_mcp 查询投影合同
+## 8. ai4sec_opencti_mcp 查询投影合同（历史兼容参考，非当前运行时）
 
 ### 8.1 投影档位
 
@@ -243,7 +237,7 @@ flowchart TD
 - GraphQL 查询限流只表达为查询配额与退避要求，不描述令牌桶或具体算法。
 - 字段裁剪能力只体现为 MCP 响应投影合同，不下沉到 GraphQL 字段映射实现。
 
-## 9. Notification MCP 最小通知合同
+## 9. Notification MCP 最小通知合同（历史兼容参考，非当前运行时）
 
 ### 9.1 模板类型
 
@@ -290,7 +284,7 @@ flowchart TD
 
 ## 10. 七段式编排契约样板
 
-说明：这里的“七段式”不再表示平台内必须存在独立 REST 资源接口，而是表示 DIFY 工作流触发面、调用关系、输入输出载荷、异步事件和错误语义的统一表达。VS1 至 VS3 复用本节规则；完整样板按任务要求使用 VS4 主链路展开。
+说明：这里的“七段式”表示目标态编排契约样板。由于统一入口、OpenCTI MCP 和 Notification MCP 已退役，以下 VS4 样板当前不代表仓库内现役运行时，只保留为后续重新建模的参考。
 
 ### 10.1 VS4 主链路时序
 
@@ -361,4 +355,4 @@ sequenceDiagram
 
 ## 13. 结论
 
-本应用层设计把五类正式业务角色统一收敛到一个“统一壳层 + 角色工作台 + 场景中心”的交互框架内，并以 ai4sec_agent 作为唯一智能入口，衔接 ai4sec_opencti_mcp、OpenCTI platform 与 Notification MCP。文档同时定义了共享 API 域、场景 API 域、Webhook 分组、字段投影合同、最小通知合同与 VS4 七段式样板，使应用层既能快速被人理解，也能为后续实现保持边界清晰。
+本应用层设计仍然以 DIFY 作为统一编排平台，但当前仓库运行时已经从“单一统一入口 + 双 MCP”演化为“多入口保留 Workflow + 直接 OpenCTI GraphQL 访问”的实现形态。文档保留了历史兼容合同与目标态样板，以便后续重新实现 VS2 / VS4、通知出口和更完整的沉淀链路时使用。
