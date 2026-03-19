@@ -1,3 +1,7 @@
+<%
+var DEFAULT_OBJECT_ID = 'vulnerability--693c68fd-9a33-5d6d-b44e-407b6a48b05b';
+var DEFAULT_OBJECT_UUID = '693c68fd-9a33-5d6d-b44e-407b6a48b05b';
+%>
 {
   "type": "bundle",
   "id": "bundle--<%= (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000' %>",
@@ -6,6 +10,10 @@
     <% 
     function isList(v) {
       return !!(v && typeof v.length === 'number' && typeof v.forEach === 'function');
+    }
+
+    function isVulnerabilityStixId(value) {
+      return typeof value === 'string' && value.indexOf('vulnerability--') === 0;
     }
 
     if (isList(notification_content) && notification_content.length > 0) {
@@ -22,15 +30,19 @@
             var fallbackUuid = (notification && notification.id) ? ('' + notification.id) : '00000000-0000-4000-8000-000000000000';
             var rawTargetId = targetId ? ('' + targetId) : '';
             var rawStandardId = targetStandardId ? ('' + targetStandardId) : '';
-            var safeStandardId = rawStandardId || rawTargetId || ('vulnerability--' + fallbackUuid);
-            if (typeof safeStandardId !== 'string') {
-              safeStandardId = '' + (safeStandardId || '');
-            }
-            if (safeStandardId.indexOf('vulnerability--') !== 0) {
-              safeStandardId = 'vulnerability--' + safeStandardId;
+            var safeStandardId = DEFAULT_OBJECT_ID;
+            if (isVulnerabilityStixId(rawStandardId)) {
+              safeStandardId = rawStandardId;
+            } else if (isVulnerabilityStixId(rawTargetId)) {
+              safeStandardId = rawTargetId;
             }
 
-            var safeLookupId = rawTargetId || rawStandardId || fallbackUuid;
+            var safeLookupId = DEFAULT_OBJECT_ID;
+            if (isVulnerabilityStixId(rawStandardId)) {
+              safeLookupId = rawStandardId;
+            } else if (isVulnerabilityStixId(rawTargetId)) {
+              safeLookupId = rawTargetId;
+            }
     %>
     {
       "type": "vulnerability",

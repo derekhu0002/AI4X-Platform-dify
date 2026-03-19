@@ -116,8 +116,26 @@ workflow:
     - data:
         sourceType: llm
         targetType: code
-      id: edge-llm-format_threat_model
+      id: edge-llm-prepare_visual_summary_input
       source: llm_threat_model
+      sourceHandle: source
+      target: prepare_visual_summary_input
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: code
+        targetType: llm
+      id: edge-prepare_visual_summary_input-llm_visual_summary
+      source: prepare_visual_summary_input
+      sourceHandle: source
+      target: llm_visual_summary
+      targetHandle: target
+      type: custom
+    - data:
+        sourceType: llm
+        targetType: code
+      id: edge-llm-format_threat_model
+      source: llm_visual_summary
       sourceHandle: source
       target: format_threat_model
       targetHandle: target
@@ -922,28 +940,509 @@ workflow:
       type: custom
       width: 242
     - data:
-        code: "import json\nimport urllib.parse\n\ndef main(response_json: str, analysis_json_raw:\
-          \ str) -> dict:\n    # // @ArchitectureID: 1436\n    payload = json.loads(response_json)\n\
-          \    matched_report = payload.get(\"matched_report\") or {}\n    \n    #\
-          \ Strip possible Markdown fences from LLM raw JSON output\n    clean_json\
-          \ = analysis_json_raw.strip()\n    if clean_json.startswith('```json'):\n\
-          \        clean_json = clean_json[7:]\n    elif clean_json.startswith('```'):\n\
-          \        clean_json = clean_json[3:]\n    if clean_json.endswith('```'):\n\
-          \        clean_json = clean_json[:-3]\n    clean_json = clean_json.strip()\n\
-          \    \n    analysis = json.loads(clean_json)\n    analysis_json = json.dumps(analysis,\
-          \ ensure_ascii=False, indent=2)\n    download_uri = \"data:application/json;charset=utf-8,\"\
-          \ + urllib.parse.quote(analysis_json)\n    summary = analysis.get(\"summary\"\
-          ) or {}\n    return {\n        \"report_name\": str(matched_report.get(\"\
-          report_name\") or \"\"),\n        \"report_id\": str(matched_report.get(\"\
-          report_id\") or \"\"),\n        \"match_strategy\": str(matched_report.get(\"\
-          match_strategy\") or \"unknown\"),\n        \"download_filename\": str(payload.get(\"\
-          download_filename\") or \"threat-model.json\"),\n        \"analysis_json\"\
-          : analysis_json,\n        \"download_markdown\": f\"[下载 JSON 结果]({download_uri})\"\
-          ,\n        \"summary_text\": (\n            f\"Generated {summary.get('attack_patterns',\
-          \ 0)} attack patterns, \"\n            f\"{summary.get('course_of_actions',\
-          \ 0)} mitigations, \"\n            f\"{summary.get('threat_scenarios', 0)}\
-          \ threat scenarios, and \"\n            f\"{summary.get('detection_indicators',\
-          \ 0)} detection indicators.\"\n        ),\n    }\n"
+        code: |
+          import json
+          import re
+
+
+          def _strip_code_fences(raw_text: str) -> str:
+            text = raw_text.strip()
+            if text.startswith('```json'):
+              text = text[7:]
+            elif text.startswith('```'):
+              text = text[3:]
+            if text.endswith('```'):
+              text = text[:-3]
+            return text.strip()
+
+
+          def _slugify(value: str) -> str:
+            slug = re.sub(r'[^a-z0-9]+', '-', value.lower()).strip('-')
+            return slug or 'entity'
+
+
+          def _name_from_object(stix_object: dict) -> str:
+            return str(
+              stix_object.get('name')
+              or stix_object.get('abstract')
+              or stix_object.get('opinion')
+              or stix_object.get('value')
+              or stix_object.get('id')
+              or 'unknown-entity'
+            ).strip()
+
+
+          def _description_from_object(stix_object: dict) -> str:
+            return str(
+              stix_object.get('description')
+              or stix_object.get('content')
+              or stix_object.get('explanation')
+              or ''
+            ).strip()
+
+
+          def _register_entity(entity_registry: dict[str, dict], entity: dict) -> None:
+            entity_id = str(entity.get('id') or '').strip()
+            if not entity_id:
+              return
+            merged = dict(entity_registry.get(entity_id) or {})
+            for key, value in entity.items():
+              if value not in (None, '', [], {}):
+                merged[key] = value
+            merged.setdefault('relationship_count', 0)
+            entity_registry[entity_id] = merged
+
+
+          def _register_relationship(relationship_registry: dict[str, dict], relationship_type: str, source_ref: str, target_ref: str, description: str = '') -> None:
+            source_ref = str(source_ref or '').strip()
+            target_ref = str(target_ref or '').strip()
+            if not source_ref or not target_ref or source_ref == target_ref:
+              return
+            relation_key = f'{relationship_type}:{source_ref}:{target_ref}'
+            relationship_registry[relation_key] = {
+              'type': 'relationship',
+              'spec_version': '2.1',
+              'id': f"x-ai4sec-relationship--{_slugify(relation_key)}",
+              'relationship_type': str(relationship_type or 'related-to').strip() or 'related-to',
+              'source_ref': source_ref,
+              'target_ref': target_ref,
+              **({'description': description.strip()} if str(description or '').strip() else {}),
+            }
+
+
+          def _make_entity(entity_id: str, entity_type: str, name: str, description: str = '') -> dict:
+            entity = {
+              'id': entity_id,
+              'type': entity_type,
+              'name': name.strip() or entity_id,
+              'relationship_count': 0,
+            }
+            if description.strip():
+              entity['description'] = description.strip()
+            return entity
+
+
+          def _resolve_asset_ref(entity_registry: dict[str, dict], asset_name: str) -> str:
+            normalized = asset_name.strip().lower()
+            for entity_id, entity in entity_registry.items():
+              if str(entity.get('name') or '').strip().lower() == normalized:
+                return entity_id
+            custom_id = f"x-ai4sec-asset--{_slugify(asset_name)}"
+            _register_entity(
+              entity_registry,
+              _make_entity(custom_id, 'x-ai4sec-asset', asset_name.strip() or custom_id),
+            )
+            return custom_id
+
+
+          def _collect_analysis_entities(entity_registry: dict[str, dict], relationship_registry: dict[str, dict], analysis: dict) -> None:
+            for attack_pattern in list(analysis.get('attack_patterns') or []):
+              attack_pattern_id = str(attack_pattern.get('id') or f"attack-pattern--{_slugify(attack_pattern.get('name') or 'attack-pattern')}")
+              _register_entity(
+                entity_registry,
+                _make_entity(
+                  attack_pattern_id,
+                  'attack-pattern',
+                  str(attack_pattern.get('name') or attack_pattern_id),
+                  str(attack_pattern.get('description') or ''),
+                ),
+              )
+
+            for course_of_action in list(analysis.get('course_of_actions') or []):
+              mitigation_id = str(course_of_action.get('id') or f"course-of-action--{_slugify(course_of_action.get('name') or 'coa')}")
+              _register_entity(
+                entity_registry,
+                _make_entity(
+                  mitigation_id,
+                  str(course_of_action.get('type') or 'course-of-action'),
+                  str(course_of_action.get('name') or mitigation_id),
+                  str(course_of_action.get('description') or ''),
+                ),
+              )
+              for attack_pattern_id in list(course_of_action.get('mitigates_attack_pattern_ids') or []):
+                _register_relationship(relationship_registry, 'mitigates', mitigation_id, str(attack_pattern_id or '').strip())
+
+            for detection_indicator in list(analysis.get('detection_indicators') or []):
+              indicator = detection_indicator.get('indicator') or {}
+              indicator_id = str(indicator.get('id') or f"indicator--{_slugify(indicator.get('name') or 'indicator')}")
+              _register_entity(
+                entity_registry,
+                _make_entity(
+                  indicator_id,
+                  str(indicator.get('type') or 'indicator'),
+                  str(indicator.get('name') or indicator_id),
+                  str(indicator.get('pattern') or ''),
+                ),
+              )
+              for attack_pattern_id in list(detection_indicator.get('indicates_attack_pattern_ids') or []):
+                _register_relationship(relationship_registry, 'indicates', indicator_id, str(attack_pattern_id or '').strip())
+
+            for security_goal in list(analysis.get('security_goals') or []):
+              goal_id = str(security_goal.get('id') or f"x-ai4sec-security-goal--{_slugify(security_goal.get('name') or 'goal')}")
+              _register_entity(
+                entity_registry,
+                _make_entity(
+                  goal_id,
+                  'x-ai4sec-security-goal',
+                  str(security_goal.get('name') or goal_id),
+                  str(security_goal.get('description') or ''),
+                ),
+              )
+
+            for attack_path in list(analysis.get('simulated_attack_paths') or []):
+              attack_path_id = str(attack_path.get('id') or f"x-ai4sec-attack-path--{_slugify(attack_path.get('name') or 'attack-path')}")
+              path_steps = [str(step).strip() for step in list(attack_path.get('path_steps') or []) if str(step).strip()]
+              _register_entity(
+                entity_registry,
+                _make_entity(
+                  attack_path_id,
+                  'x-ai4sec-attack-path',
+                  str(attack_path.get('name') or attack_path_id),
+                  ' | '.join(path_steps),
+                ),
+              )
+
+            for target in list(analysis.get('targets') or []):
+              asset_name = str(target.get('asset_name') or '').strip()
+              attack_pattern_id = str(target.get('attack_pattern_id') or '').strip()
+              if not asset_name or not attack_pattern_id:
+                continue
+              asset_ref = _resolve_asset_ref(entity_registry, asset_name)
+              _register_relationship(
+                relationship_registry,
+                'targets',
+                attack_pattern_id,
+                asset_ref,
+                str(target.get('intrinsic_value_reason') or ''),
+              )
+
+            threat_scenarios = list((analysis.get('tara_stride_outputs') or {}).get('threat_scenarios') or [])
+            for index, scenario in enumerate(threat_scenarios, start=1):
+              scenario_name = str(scenario.get('name') or scenario.get('title') or f'Threat Scenario {index}')
+              scenario_id = str(scenario.get('id') or f"x-ai4sec-threat-scenario--{_slugify(scenario_name)}")
+              scenario_description = str(scenario.get('description') or scenario.get('summary') or '')
+              _register_entity(
+                entity_registry,
+                _make_entity(scenario_id, 'x-ai4sec-threat-scenario', scenario_name, scenario_description),
+              )
+              linked_attack_pattern_ids = []
+              for key, value in scenario.items():
+                if 'attack_pattern' not in key:
+                  continue
+                if isinstance(value, list):
+                  linked_attack_pattern_ids.extend(str(item).strip() for item in value if str(item).strip())
+                else:
+                  linked_attack_pattern_ids.append(str(value).strip())
+              for attack_pattern_id in linked_attack_pattern_ids:
+                _register_relationship(relationship_registry, 'relates-to', scenario_id, attack_pattern_id)
+
+
+          def main(response_json: str, analysis_json_raw: str) -> dict:
+            # // @ArchitectureID: 1436
+            payload = json.loads(response_json)
+            analysis = json.loads(_strip_code_fences(analysis_json_raw))
+
+            bundle = payload.get('bundle') or {}
+            objects = list(bundle.get('objects') or [])
+            relationship_objects = [obj for obj in objects if str(obj.get('type') or '').lower() == 'relationship']
+
+            entity_registry: dict[str, dict] = {}
+            relationship_registry: dict[str, dict] = {}
+
+            for stix_object in objects:
+              object_type = str(stix_object.get('type') or '').lower()
+              if object_type in {'bundle', 'report', 'relationship'}:
+                continue
+              _register_entity(
+                entity_registry,
+                {
+                  'id': str(stix_object.get('id') or ''),
+                  'type': object_type,
+                  'name': _name_from_object(stix_object),
+                  'description': _description_from_object(stix_object),
+                  'relationship_count': 0,
+                },
+              )
+
+            for relation in relationship_objects:
+              _register_relationship(
+                relationship_registry,
+                str(relation.get('relationship_type') or 'related-to'),
+                str(relation.get('source_ref') or ''),
+                str(relation.get('target_ref') or ''),
+                str(relation.get('description') or ''),
+              )
+
+            _collect_analysis_entities(entity_registry, relationship_registry, analysis)
+
+            relationship_counts = {}
+            for relation in relationship_registry.values():
+              for ref_key in ('source_ref', 'target_ref'):
+                ref_value = str(relation.get(ref_key) or '').strip()
+                if ref_value:
+                  relationship_counts[ref_value] = relationship_counts.get(ref_value, 0) + 1
+
+            for entity_id, entity in entity_registry.items():
+              entity['relationship_count'] = relationship_counts.get(entity_id, 0)
+
+            entity_tables = {}
+            for entity in entity_registry.values():
+              object_type = str(entity.get('type') or 'unknown').lower()
+              entity_tables.setdefault(object_type, []).append(entity)
+            for object_type in entity_tables:
+              entity_tables[object_type] = sorted(entity_tables[object_type], key=lambda item: (str(item.get('name') or ''), str(item.get('id') or '')))
+
+            topology_objects = list(entity_registry.values()) + list(relationship_registry.values())
+            visual_summary_input = {
+              'report': payload.get('matched_report') or {},
+              'summary': analysis.get('summary') or {},
+              'topology': {
+                'type': 'bundle',
+                'id': f"bundle--visual-summary-{_slugify(str((payload.get('matched_report') or {}).get('report_id') or 'report'))}",
+                'spec_version': '2.1',
+                'objects': topology_objects,
+              },
+              'entity_tables': entity_tables,
+            }
+            return {'visual_summary_input': json.dumps(visual_summary_input, ensure_ascii=False)}
+        code_language: python3
+        desc: ''
+        outputs:
+          visual_summary_input:
+            children: null
+            type: string
+        selected: false
+        title: Prepare Visual Summary Input
+        type: code
+        variables:
+        - value_selector:
+          - query_threat_model_report
+          - response_json
+          variable: response_json
+        - value_selector:
+          - llm_threat_model
+          - text
+          variable: analysis_json_raw
+      height: 52
+      id: prepare_visual_summary_input
+      position:
+        x: 1250
+        y: 126
+      positionAbsolute:
+        x: 1250
+        y: 126
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: ''
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: Assistant
+            user: Human
+          window:
+            enabled: false
+            size: 10
+        model:
+          completion_params: {}
+          mode: chat
+          name: qwq-plus
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - edition_type: basic
+          id: 8f8a4f9b-3a67-4526-b522-4f7f8f8c1001
+          role: system
+          text: 'Convert the provided threat-model structure into Markdown only.
+
+
+            Output order:
+
+            1) Start with a Mermaid diagram fenced as ```mermaid.
+
+            2) Then emit Markdown tables grouped by entity type.
+
+            Rules:
+
+            - The input topology is already STIX-compliant. Build the Mermaid graph from topology.objects only.
+
+            - Only use relationship objects for edges and entity names for nodes.
+
+            - Keep the graph minimal and readable.
+
+            - Prefer columns name, id, type, description, relationship_count.
+
+            - Drop unavailable columns instead of fabricating values.
+
+            - Omit indicator and attack path sections when absent.
+
+            - Do not repeat raw JSON.
+
+            - Do not add prose before the Mermaid block.'
+        - edition_type: basic
+          id: 8f8a4f9b-3a67-4526-b522-4f7f8f8c1002
+          role: user
+          text: 'Prepared visual-summary source JSON:
+
+            {{#prepare_visual_summary_input.visual_summary_input#}}'
+        reasoning_format: separated
+        selected: false
+        structured_output_enabled: false
+        title: Generate Visual Summary
+        type: llm
+        vision:
+          enabled: false
+      height: 88
+      id: llm_visual_summary
+      position:
+        x: 1560
+        y: -8
+      positionAbsolute:
+        x: 1560
+        y: -8
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: |
+          import json
+          import re
+          import urllib.parse
+
+
+          def _strip_code_fences(raw_text: str) -> str:
+            text = raw_text.strip()
+            if text.startswith('```json'):
+              text = text[7:]
+            elif text.startswith('```'):
+              text = text[3:]
+            if text.endswith('```'):
+              text = text[:-3]
+            return text.strip()
+
+
+          def _sanitize_mermaid_text(value: str) -> str:
+            sanitized = str(value or '').replace('\n', ' ')
+            sanitized = sanitized.replace('"', "'").replace('`', '')
+            sanitized = re.sub(r'\s+', ' ', sanitized)
+            sanitized = re.sub(r'[\[\]{}()]', ' ', sanitized)
+            return sanitized.strip() or 'unknown'
+
+
+          def _build_mermaid(topology: dict) -> str:
+            objects = list(topology.get('objects') or [])
+            entities = {
+              str(obj.get('id') or '').strip(): obj
+              for obj in objects
+              if str(obj.get('type') or '').lower() not in {'', 'relationship'} and str(obj.get('id') or '').strip()
+            }
+            relationships = [obj for obj in objects if str(obj.get('type') or '').lower() == 'relationship']
+
+            if not entities:
+              return '```mermaid\ngraph LR\n  empty["No topology entities available"]\n```'
+
+            alias_by_id = {}
+            for index, entity_id in enumerate(sorted(entities), start=1):
+              alias_by_id[entity_id] = f'N{index}'
+
+            lines = ['```mermaid', 'graph LR']
+            for entity_id in sorted(entities):
+              entity = entities[entity_id]
+              label = _sanitize_mermaid_text(entity.get('name') or entity_id)
+              lines.append(f'  {alias_by_id[entity_id]}["{label}"]')
+
+            edge_count = 0
+            for relation in relationships:
+              source_ref = str(relation.get('source_ref') or '').strip()
+              target_ref = str(relation.get('target_ref') or '').strip()
+              if source_ref not in alias_by_id or target_ref not in alias_by_id:
+                continue
+              relationship_type = _sanitize_mermaid_text(relation.get('relationship_type') or 'related-to')
+              lines.append(f'  {alias_by_id[source_ref]} -->|{relationship_type}| {alias_by_id[target_ref]}')
+              edge_count += 1
+
+            if edge_count == 0:
+              first_alias = alias_by_id[sorted(entities)[0]]
+              lines.append(f'  {first_alias}')
+
+            lines.append('```')
+            return '\n'.join(lines)
+
+
+          def _extract_table_section(markdown_text: str) -> str:
+            text = markdown_text.strip()
+            if not text:
+              return ''
+            text = re.sub(r'```mermaid\s*.*?```', '', text, flags=re.IGNORECASE | re.DOTALL)
+            return text.strip()
+
+
+          def _escape_table_cell(value: object) -> str:
+            sanitized = str(value or '').replace('\n', ' ')
+            sanitized = re.sub(r'\s+', ' ', sanitized)
+            return sanitized.replace('|', '\\|').strip()
+
+
+          def _build_table_markdown(entity_tables: dict) -> str:
+            sections = []
+            preferred_columns = ['name', 'id', 'type', 'description', 'relationship_count']
+            for entity_type in sorted(entity_tables):
+              rows = list(entity_tables.get(entity_type) or [])
+              if not rows:
+                continue
+              columns = [column for column in preferred_columns if any(str(row.get(column) or '').strip() for row in rows)]
+              if 'id' not in columns:
+                columns.insert(0, 'id')
+              if 'type' not in columns:
+                columns.insert(min(len(columns), 1), 'type')
+              sections.append(f'### {entity_type}')
+              sections.append('| ' + ' | '.join(columns) + ' |')
+              sections.append('| ' + ' | '.join('---' for _ in columns) + ' |')
+              for row in rows:
+                sections.append('| ' + ' | '.join(_escape_table_cell(row.get(column, '')) for column in columns) + ' |')
+              sections.append('')
+            return '\n'.join(section for section in sections if section is not None).strip()
+
+
+          def main(response_json: str, analysis_json_raw: str, visual_summary_raw: str, visual_summary_input_json: str) -> dict:
+            # // @ArchitectureID: 1436
+            payload = json.loads(response_json)
+            matched_report = payload.get('matched_report') or {}
+
+            analysis = json.loads(_strip_code_fences(analysis_json_raw))
+            analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2)
+            download_uri = 'data:application/json;charset=utf-8,' + urllib.parse.quote(analysis_json)
+            summary = analysis.get('summary') or {}
+
+            visual_summary_input = json.loads(visual_summary_input_json)
+            topology = visual_summary_input.get('topology') or {}
+            entity_tables = visual_summary_input.get('entity_tables') or {}
+
+            mermaid_block = _build_mermaid(topology)
+            llm_tables = _extract_table_section(visual_summary_raw)
+            table_markdown = llm_tables if '|' in llm_tables else _build_table_markdown(entity_tables)
+            visual_summary_markdown = mermaid_block if not table_markdown else f'{mermaid_block}\n\n{table_markdown}'
+
+            return {
+              'report_name': str(matched_report.get('report_name') or ''),
+              'report_id': str(matched_report.get('report_id') or ''),
+              'match_strategy': str(matched_report.get('match_strategy') or 'unknown'),
+              'download_filename': str(payload.get('download_filename') or 'threat-model.json'),
+              'analysis_json': analysis_json,
+              'download_markdown': f'[下载 JSON 结果]({download_uri})',
+              'summary_text': (
+                f"Generated {summary.get('attack_patterns', 0)} attack patterns, "
+                f"{summary.get('course_of_actions', 0)} mitigations, "
+                f"{summary.get('threat_scenarios', 0)} threat scenarios, and "
+                f"{summary.get('detection_indicators', 0)} detection indicators."
+              ),
+              'visual_summary_markdown': visual_summary_markdown,
+            }
         code_language: python3
         desc: ''
         outputs:
@@ -968,6 +1467,9 @@ workflow:
           summary_text:
             children: null
             type: string
+          visual_summary_markdown:
+            children: null
+            type: string
         selected: false
         title: Format Threat Model Result
         type: code
@@ -980,13 +1482,21 @@ workflow:
           - llm_threat_model
           - text
           variable: analysis_json_raw
+        - value_selector:
+          - llm_visual_summary
+          - text
+          variable: visual_summary_raw
+        - value_selector:
+          - prepare_visual_summary_input
+          - visual_summary_input
+          variable: visual_summary_input_json
       height: 52
       id: format_threat_model
       position:
-        x: 1280
+        x: 1860
         y: 140
       positionAbsolute:
-        x: 1280
+        x: 1860
         y: 140
       sourcePosition: right
       targetPosition: left
@@ -1005,6 +1515,12 @@ workflow:
           - 下载文件名：{{#format_threat_model.download_filename#}}
 
           - 摘要：{{#format_threat_model.summary_text#}}
+
+
+          Visual Summary:
+
+
+          {{#format_threat_model.visual_summary_markdown#}}
 
 
           {{#format_threat_model.download_markdown#}}
@@ -1028,10 +1544,10 @@ workflow:
       height: 309
       id: answer_threat_model
       position:
-        x: 1580
+        x: 2160
         y: 82
       positionAbsolute:
-        x: 1580
+        x: 2160
         y: 82
       sourcePosition: right
       targetPosition: left

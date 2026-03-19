@@ -12,12 +12,20 @@ workflow:
   conversation_variables: []
   environment_variables:
   - description: ''
-    id: webhook-opencti-url
-    name: OPENCTI_MCP_URL
+    id: webhook-opencti-graphql-url
+    name: OPENCTI_GRAPHQL_URL
     selector:
     - env
-    - OPENCTI_MCP_URL
-    value: http://host.docker.internal:8101
+    - OPENCTI_GRAPHQL_URL
+    value: http://host.docker.internal:8080/graphql
+    value_type: string
+  - description: ''
+    id: webhook-opencti-admin-token
+    name: OPENCTI_ADMIN_TOKEN
+    selector:
+    - env
+    - OPENCTI_ADMIN_TOKEN
+    value: c118a69a-9d60-441f-b30b-a0967694707e
     value_type: string
   features:
     file_upload:
@@ -121,11 +129,137 @@ workflow:
       type: custom
       width: 242
     - data:
-        code: "import json\n\ndef _extract_bundle_from_dify_webhook(raw_payload: object) -> dict:\n    # @ArchitectureID: 1214\n    \"\"\"\n    Extract STIX bundle from Dify webhook context.\n    Dify webhook trigger wraps request in {body, headers, method, ...} structure.\n    Target bundle is in raw_payload['body'] or raw_payload itself.\n    \"\"\"\n    if not isinstance(raw_payload, dict):\n        raise ValueError('Webhook payload must be a dict object.')\n    \n    # Try to extract from Dify webhook structure first\n    bundle_candidate = raw_payload.get('body')\n    if bundle_candidate is None:\n        # Fallback: treat entire payload as bundle (direct mode)\n        bundle_candidate = raw_payload\n    \n    # Coerce string JSON to dict if needed\n    if isinstance(bundle_candidate, str):\n        bundle = json.loads(bundle_candidate)\n    elif isinstance(bundle_candidate, dict):\n        bundle = bundle_candidate\n    else:\n        raise ValueError('Webhook body must contain a valid STIX bundle object.')\n    \n    return bundle\n\n\ndef main(raw_payload: object) -> dict:\n    bundle = _extract_bundle_from_dify_webhook(raw_payload)\n    objects = bundle.get('objects') or []\n    if not objects:\n        raise ValueError(f'Webhook bundle {bundle.get(\"id\")} must contain at least one STIX object.')\n\n    signal = objects[0]\n    lookup_id = str(signal.get('x_opencti_id') or signal.get('id') or '').strip()\n    if not lookup_id:\n        raise ValueError('Webhook signal does not contain lookup id.')\n\n    object_type = str(signal.get('type') or 'vulnerability').strip()\n    \n    # Derive flow by object type (webhook entry defaults to VS3)\n    if object_type == 'attack-pattern':\n        derived_flow = 'VS1'\n    elif object_type in {'incident', 'grouping'}:\n        derived_flow = 'VS2'\n    elif object_type == 'vulnerability':\n        derived_flow = 'VS3'\n    elif object_type == 'indicator':\n        derived_flow = 'VS4'\n    else:\n        derived_flow = 'VS3'\n\n    return {\n        'lookup_id': lookup_id,\n        'object_type': object_type,\n        'selected_flow': derived_flow,\n        'bundle_id': str(bundle.get('id') or ''),\n        'user_request': f'来自 OpenCTI webhook 的 {object_type} 信号：{lookup_id}',\n    }\n"
+        code: |
+          import json
+
+          def _extract_bundle_from_dify_webhook(raw_payload: object) -> dict:
+              """// @ArchitectureID: 1277"""
+              if not isinstance(raw_payload, dict):
+                  raise ValueError('Webhook payload must be a dict object.')
+
+              bundle_candidate = raw_payload.get('body')
+              if bundle_candidate is None:
+                  bundle_candidate = raw_payload
+
+              if isinstance(bundle_candidate, str):
+                  bundle = json.loads(bundle_candidate)
+              elif isinstance(bundle_candidate, dict):
+                  bundle = bundle_candidate
+              else:
+                  raise ValueError('Webhook body must contain a valid STIX bundle object.')
+
+              return bundle
+
+
+          def main(raw_payload: object) -> dict:
+              """// @ArchitectureID: 1277"""
+              bundle = _extract_bundle_from_dify_webhook(raw_payload)
+              objects = bundle.get('objects') or []
+              if not objects:
+                  raise ValueError(f"Webhook bundle {bundle.get('id')} must contain at least one STIX object.")
+
+              signal = objects[0]
+              lookup_id = str(signal.get('x_opencti_id') or signal.get('id') or '').strip()
+              if not lookup_id:
+                  raise ValueError('Webhook signal does not contain lookup id.')
+
+              object_type = str(signal.get('type') or 'vulnerability').strip().lower()
+              if object_type == 'attack-pattern':
+                  derived_flow = 'VS1'
+              elif object_type in {'incident', 'grouping'}:
+                  derived_flow = 'VS2'
+              elif object_type == 'indicator':
+                  derived_flow = 'VS4'
+              else:
+                  derived_flow = 'VS3'
+
+              graphql_query = """
+              query WebhookContext($id: String!, $ids: [String!], $first: Int!) {
+                stixCoreObject(id: $id) {
+                  id
+                  standard_id
+                  entity_type
+                  representative { main secondary }
+                  ... on Vulnerability {
+                    vulnerability_name: name
+                    description
+                    x_opencti_cvss_base_score
+                  }
+                  ... on Infrastructure {
+                    infrastructure_name: name
+                    description
+                    infrastructure_types
+                  }
+                  ... on Software {
+                    software_name: name
+                    vendor
+                    version
+                  }
+                  ... on Identity {
+                    identity_name: name
+                    identity_class
+                  }
+                }
+                fromRelationships: stixCoreRelationships(first: $first, fromId: $ids) {
+                  edges {
+                    node {
+                      relationship_type
+                      description
+                      to {
+                        __typename
+                        ... on BasicObject { id standard_id entity_type }
+                        ... on StixObject { representative { main secondary } }
+                        ... on Vulnerability { vulnerability_name: name description x_opencti_cvss_base_score }
+                        ... on Infrastructure { infrastructure_name: name description infrastructure_types }
+                        ... on Software { software_name: name vendor version }
+                        ... on Identity { identity_name: name identity_class }
+                      }
+                    }
+                  }
+                }
+                toRelationships: stixCoreRelationships(first: $first, toId: $ids) {
+                  edges {
+                    node {
+                      relationship_type
+                      description
+                      from {
+                        __typename
+                        ... on BasicObject { id standard_id entity_type }
+                        ... on StixObject { representative { main secondary } }
+                        ... on Vulnerability { vulnerability_name: name description x_opencti_cvss_base_score }
+                        ... on Infrastructure { infrastructure_name: name description infrastructure_types }
+                        ... on Software { software_name: name vendor version }
+                        ... on Identity { identity_name: name identity_class }
+                      }
+                    }
+                  }
+                }
+              }
+              """
+              graphql_request = json.dumps(
+                  {
+                      'query': graphql_query,
+                      'operationName': 'WebhookContext',
+                      'variables': {'id': lookup_id, 'ids': [lookup_id], 'first': 50},
+                  },
+                  ensure_ascii=False,
+              )
+
+              return {
+                  'lookup_id': lookup_id,
+                  'object_type': object_type,
+                  'selected_flow': derived_flow,
+                  'bundle_id': str(bundle.get('id') or ''),
+                  'user_request': f'来自 OpenCTI webhook 的 {object_type} 信号：{lookup_id}',
+                  'graphql_request': graphql_request,
+              }
         code_language: python3
         desc: ''
         outputs:
           bundle_id:
+            children: null
+            type: string
+          graphql_request:
             children: null
             type: string
           lookup_id:
@@ -167,10 +301,10 @@ workflow:
         body:
           data:
           - type: text
-            value: '{"object_id":"{{#normalize_webhook.lookup_id#}}","object_type":"{{#normalize_webhook.object_type#}}","projection_profile":"notification","fields":["risk_object","scene_type","severity","priority","task_status","business_impact","target_roles","primary_asset","deployment_scope","owner_team","business_domain","business_criticality","execution_window"],"include_relationships":false}'
+            value: '{{#normalize_webhook.graphql_request#}}'
           type: json
         desc: ''
-        headers: ''
+        headers: 'Authorization: Bearer {{#env.OPENCTI_ADMIN_TOKEN#}}'
         method: post
         params: ''
         retry_config:
@@ -186,9 +320,9 @@ workflow:
           max_write_timeout: 600
           read: 600
           write: 600
-        title: Query OpenCTI MCP
+        title: Query OpenCTI GraphQL
         type: http-request
-        url: '{{#env.OPENCTI_MCP_URL#}}/query'
+        url: '{{#env.OPENCTI_GRAPHQL_URL#}}'
         variables: []
       height: 142
       id: query_opencti
@@ -203,23 +337,252 @@ workflow:
       type: custom
       width: 242
     - data:
-        code: "import json\n\ndef main(response_json: str, selected_flow: str, lookup_id: str, bundle_id: str) -> dict:\n    # @ArchitectureID: 1214\n    payload = json.loads(response_json)\n    item = (payload.get('items') or [{}])[0]\n    return {\n        'scene_type': str(item.get('scene_type') or selected_flow),\n        'severity': str(item.get('severity') or 'unknown'),\n        'task_status': str(item.get('task_status') or '待处理'),\n        'name': str(item.get('name') or lookup_id),\n        'lookup_id': lookup_id,\n        'bundle_id': bundle_id or 'unknown-bundle',\n    }\n"
+        code: |
+          import json
+          import re
+
+          def _safe_float(value: object) -> float | None:
+            """// @ArchitectureID: 1277"""
+            try:
+              return float(value)
+            except (TypeError, ValueError):
+              return None
+
+
+          def _extract_name(node: dict) -> str:
+            """// @ArchitectureID: 1277"""
+            representative = node.get('representative') or {}
+            for key in ('name', 'vulnerability_name', 'software_name', 'infrastructure_name', 'identity_name'):
+              value = str(node.get(key) or '').strip()
+              if value:
+                return value
+            main_name = str(representative.get('main') or '').strip()
+            if main_name:
+              return main_name
+            return str(node.get('standard_id') or node.get('id') or 'unknown-object')
+
+
+          def _extract_description(node: dict) -> str:
+            """// @ArchitectureID: 1277"""
+            representative = node.get('representative') or {}
+            for key in ('description', 'content', 'explanation'):
+              value = str(node.get(key) or '').strip()
+              if value:
+                return value
+            return str(representative.get('secondary') or '').strip()
+
+
+          def _normalize_type(node: dict) -> str:
+            """// @ArchitectureID: 1277"""
+            return str(node.get('entity_type') or node.get('__typename') or '').strip().lower().replace('_', '-')
+
+
+          def _criticality_multiplier(related_objects: list[dict]) -> tuple[float, str]:
+            """// @ArchitectureID: 1277"""
+            best_score = 1.0
+            best_reason = '业务关键度字段缺失，按 1.0 计算。'
+            for related in related_objects:
+              haystack = f"{related['name']} {related['description']}".lower()
+              if any(token in haystack for token in ('payment', 'gateway', 'core', 'critical', 'auth')):
+                return 1.5, f"根据对象 {related['name']} 的名称/描述推断为核心业务资产。"
+              if any(token in haystack for token in ('user', 'account', 'order', 'profile', 'important')) and best_score < 1.2:
+                best_score = 1.2
+                best_reason = f"根据对象 {related['name']} 的名称/描述推断为重要业务资产。"
+              if any(token in haystack for token in ('test', 'sandbox', 'dev', 'staging')) and best_score <= 1.0:
+                best_score = 0.8
+                best_reason = f"根据对象 {related['name']} 的名称/描述推断为非关键资产。"
+            return best_score, best_reason
+
+
+          def _exposure_multiplier(related_objects: list[dict]) -> tuple[float, str]:
+            """// @ArchitectureID: 1277"""
+            for related in related_objects:
+              haystack = f"{related['name']} {related['description']}".lower()
+              if any(token in haystack for token in ('internet', 'public', 'external', 'dmz', 'web', 'api', 'gateway')):
+                return 1.5, f"对象 {related['name']} 呈现外网/公网暴露特征。"
+            for related in related_objects:
+              haystack = f"{related['name']} {related['description']}".lower()
+              if any(token in haystack for token in ('office', 'corp', 'intranet', 'internal')):
+                return 1.1, f"对象 {related['name']} 呈现办公网/内网可达特征。"
+            for related in related_objects:
+              haystack = f"{related['name']} {related['description']}".lower()
+              if any(token in haystack for token in ('isolated', 'airgap', 'segmented', 'core zone')):
+                return 0.9, f"对象 {related['name']} 呈现隔离环境特征。"
+            return 1.0, '暴露面字段缺失，按 1.0 计算。'
+
+
+          def _threat_intel_multiplier(target_name: str, target_description: str) -> tuple[float, str]:
+            """// @ArchitectureID: 1277"""
+            haystack = f"{target_name} {target_description}".lower()
+            if any(token in haystack for token in ('active exploitation', 'actively exploited', 'in the wild', 'kev', '在野利用')):
+              return 2.0, '漏洞描述显示存在在野利用迹象。'
+            if any(token in haystack for token in ('poc', 'proof of concept', 'exploit available', '公开poc')):
+              return 1.5, '漏洞描述显示已存在公开 PoC / exploit。'
+            return 1.0, '威胁情报字段缺失，按 1.0 计算。'
+
+
+          def _severity_tier(score: float) -> tuple[str, str, str]:
+            """// @ArchitectureID: 1277"""
+            if score >= 90:
+              return 'Critical', 'P0 / Immediate Action', '立即行动：隔离高风险资产、创建 P0 事件，并在 24 小时内完成初步缓解。'
+            if score >= 70:
+              return 'High', 'P1 / Urgent', '紧急处理：由安全运营团队主导缓解，并在 72 小时内完成初步缓解。'
+            if score >= 40:
+              return 'Medium', 'P2 / Planned Remediation', '计划内修复：在常规补丁周期中完成处置，并保持持续跟踪。'
+            return 'Low / Normal', 'P3 / Opportunistic', '按需处理：记录风险、结合窗口期安排机会性修复或接受风险。'
+
+
+          def _extract_cvss_score(target_node: dict, target_description: str) -> tuple[float, str | None]:
+            """// @ArchitectureID: 1277"""
+            explicit_score = _safe_float(target_node.get('x_opencti_cvss_base_score'))
+            if explicit_score is not None:
+              return explicit_score, None
+            match = re.search(r'cvss[^0-9]*([0-9]+(?:\.[0-9]+)?)', target_description, flags=re.IGNORECASE)
+            if match:
+              return float(match.group(1)), 'CVSS 基础分缺少独立字段，已从描述文本提取。'
+            return 5.0, 'CVSS 基础分缺失，按 5.0 中位值估算。'
+
+
+          def main(response_json: str, selected_flow: str, lookup_id: str, bundle_id: str) -> dict:
+            """// @ArchitectureID: 1277"""
+            payload = json.loads(response_json)
+            errors = payload.get('errors') or []
+            if errors:
+              detail = errors[0].get('message') if isinstance(errors[0], dict) else str(errors[0])
+              raise ValueError(f'OpenCTI GraphQL 错误: {detail}')
+
+            data = payload.get('data') or {}
+            target_node = data.get('stixCoreObject') or {}
+            target_name = _extract_name(target_node)
+            target_description = _extract_description(target_node)
+
+            related_objects = []
+            related_index = set()
+            for edge_key, endpoint_key in (('fromRelationships', 'to'), ('toRelationships', 'from')):
+              for edge in (data.get(edge_key, {}) or {}).get('edges', []):
+                relation = edge.get('node') or {}
+                endpoint = relation.get(endpoint_key) or {}
+                endpoint_type = _normalize_type(endpoint)
+                endpoint_name = _extract_name(endpoint)
+                endpoint_id = str(endpoint.get('standard_id') or endpoint.get('id') or endpoint_name)
+                if not endpoint_id or endpoint_id in related_index or endpoint_type == 'vulnerability':
+                  continue
+                related_index.add(endpoint_id)
+                related_objects.append(
+                  {
+                    'id': endpoint_id,
+                    'name': endpoint_name,
+                    'type': endpoint_type or 'unknown',
+                    'description': _extract_description(endpoint),
+                    'relationship_type': str(relation.get('relationship_type') or 'related-to'),
+                  }
+                )
+
+            infrastructures = sorted({item['name'] for item in related_objects if item['type'] == 'infrastructure' and item['name']})
+            software_products = sorted({item['name'] for item in related_objects if item['type'] == 'software' and item['name']})
+            manual_candidates = sorted(
+              {
+                item['name']
+                for item in related_objects
+                if item['type'] not in {'infrastructure', 'software', 'identity'} and item['name']
+              }
+            )
+
+            cvss_score, cvss_note = _extract_cvss_score(target_node, target_description)
+            criticality_multiplier, criticality_note = _criticality_multiplier(related_objects)
+            exposure_multiplier, exposure_note = _exposure_multiplier(related_objects)
+            threat_multiplier, threat_note = _threat_intel_multiplier(target_name, target_description)
+            risk_score = round(cvss_score * 10 * criticality_multiplier * exposure_multiplier * threat_multiplier, 1)
+            severity_tier, priority_recommendation, recommended_action = _severity_tier(risk_score)
+
+            missing_context = []
+            for note in (cvss_note, criticality_note, exposure_note, threat_note):
+              if note and ('缺失' in note or '估算' in note):
+                missing_context.append(note)
+            if not infrastructures and not software_products:
+              missing_context.append('未检索到一跳 Infrastructure / Software 关联，影响对象需人工确认。')
+
+            affected_infrastructures = '、'.join(infrastructures) if infrastructures else '未发现一跳基础设施对象'
+            affected_products = '、'.join(software_products) if software_products else '未发现一跳软件产品对象'
+            manual_confirmation = '、'.join(manual_candidates) if manual_candidates else '无'
+
+            business_impact_summary = (
+              f"基于一跳关系识别到 {len(infrastructures)} 个基础设施候选和 {len(software_products)} 个软件候选，"
+              f"当前优先影响对象为 {affected_products if software_products != '未发现一跳软件产品对象' else affected_infrastructures}。"
+            )
+            decision_summary = (
+              f"{target_name} 的情境化风险评分为 {risk_score:.1f}，映射为 {severity_tier}。"
+              f"建议按 {priority_recommendation} 执行，且本 webhook 链路仅输出分析结果，不自动触发通知。"
+            )
+
+            return {
+              'scene_type': selected_flow or 'VS3',
+              'severity': severity_tier,
+              'severity_tier': severity_tier,
+              'task_status': '分析完成',
+              'name': target_name or lookup_id,
+              'lookup_id': lookup_id,
+              'bundle_id': bundle_id or 'unknown-bundle',
+              'risk_score': f'{risk_score:.1f}',
+              'recommended_action': recommended_action,
+              'priority_recommendation': priority_recommendation,
+              'business_impact_summary': business_impact_summary,
+              'decision_summary': decision_summary,
+              'affected_infrastructures': affected_infrastructures,
+              'affected_products': affected_products,
+              'manual_confirmation': manual_confirmation,
+              'missing_context': '；'.join(missing_context) if missing_context else '无',
+              'query_path': 'OpenCTI GraphQL HTTP node',
+            }
         code_language: python3
         desc: ''
         outputs:
+          affected_infrastructures:
+            children: null
+            type: string
+          affected_products:
+            children: null
+            type: string
+          business_impact_summary:
+            children: null
+            type: string
           bundle_id:
+            children: null
+            type: string
+          decision_summary:
             children: null
             type: string
           lookup_id:
             children: null
             type: string
+          manual_confirmation:
+            children: null
+            type: string
+          missing_context:
+            children: null
+            type: string
           name:
+            children: null
+            type: string
+          priority_recommendation:
+            children: null
+            type: string
+          query_path:
+            children: null
+            type: string
+          recommended_action:
+            children: null
+            type: string
+          risk_score:
             children: null
             type: string
           scene_type:
             children: null
             type: string
           severity:
+            children: null
+            type: string
+          severity_tier:
             children: null
             type: string
           task_status:
@@ -258,7 +621,7 @@ workflow:
       type: custom
       width: 242
     - data:
-        answer: 'Webhook 已受理。\n\n- Bundle ID：{{#build_response.bundle_id#}}\n- Lookup ID：{{#build_response.lookup_id#}}\n- 场景：{{#build_response.scene_type#}}\n- 对象：{{#build_response.name#}}\n- 严重度：{{#build_response.severity#}}\n- 当前状态：{{#build_response.task_status#}}\n'
+        answer: 'Webhook 已受理并完成一跳影响分析。\n\n- Bundle ID：{{#build_response.bundle_id#}}\n- Lookup ID：{{#build_response.lookup_id#}}\n- 场景：{{#build_response.scene_type#}}\n- 对象：{{#build_response.name#}}\n- Severity Tier：{{#build_response.severity_tier#}}\n- Risk Score：{{#build_response.risk_score#}}\n- Affected Infrastructures：{{#build_response.affected_infrastructures#}}\n- Affected Products：{{#build_response.affected_products#}}\n- Priority Recommendation：{{#build_response.priority_recommendation#}}\n- Recommended Action：{{#build_response.recommended_action#}}\n- Business Impact Summary：{{#build_response.business_impact_summary#}}\n- Decision Summary：{{#build_response.decision_summary#}}\n- 需人工确认对象：{{#build_response.manual_confirmation#}}\n- 缺失上下文：{{#build_response.missing_context#}}\n- 查询路径：{{#build_response.query_path#}}\n- 当前状态：{{#build_response.task_status#}}\n'
         desc: ''
         selected: false
         title: Webhook Output
